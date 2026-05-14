@@ -2,19 +2,12 @@ import React, { useState } from 'react';
 import axios from '../../utils/axiosSetup';
 
 /**
- * Componente de inicio de sesión para la plataforma CompliSec.
- *
- * @param {Object} props
- * @param {Function} props.onLoginSuccess - Callback invocado al iniciar sesión exitosamente.
- * @param {Function} props.onGoToRegister - Callback para cambiar a la vista de Onboarding.
+ * Pantalla de inicio de sesión.
+ * Al autenticarse correctamente guarda el token y pasa los datos del usuario al padre.
  */
 const Login = ({ onLoginSuccess, onGoToRegister }) => {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
-  
-  const [error, setError] = useState('');
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [error, setError]       = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -31,20 +24,19 @@ const Login = ({ onLoginSuccess, onGoToRegister }) => {
     try {
       const response = await axios.post('/api/auth/login', formData);
       const { user, token } = response.data.data;
-      
-      // Guardar el token en localStorage
+
+      // Guardar token antes de llamar al callback
       localStorage.setItem('token', token);
-      
-      // Notificar a App.jsx
-      onLoginSuccess(user);
+
+      // Pasar usuario Y token al padre para que pueda cargar el nombre
+      onLoginSuccess(user, token);
     } catch (err) {
-      if (err.response && err.response.status === 401) {
+      if (err.response?.status === 401) {
         setError('Correo o contraseña incorrectos.');
-      } else if (err.response && err.response.status === 400 && err.response.data.details) {
-        // Zod validation errors
+      } else if (err.response?.status === 400 && err.response.data.details) {
         setError(err.response.data.details[0].message);
       } else {
-        setError('Ocurrió un error inesperado al intentar iniciar sesión.');
+        setError('Ocurrió un error inesperado. Inténtelo de nuevo.');
       }
     } finally {
       setIsLoading(false);
@@ -53,9 +45,8 @@ const Login = ({ onLoginSuccess, onGoToRegister }) => {
 
   return (
     <div className="onboarding-container glass-panel" style={{ maxWidth: '400px', margin: '4rem auto' }}>
-      <div className="section-header" style={{ textAlign: 'center' }}>
-        <div className="logo-icon" style={{ margin: '0 auto 1rem auto', width: '40px', height: '40px' }}></div>
-        <h2>Iniciar Sesión</h2>
+      <div className="section-header" style={{ flexDirection: 'column', textAlign: 'center' }}>
+        <h2 style={{ color: 'var(--accent)' }}>Iniciar Sesión</h2>
         <p className="subtitle">Accede a tu plataforma ISO 27001</p>
       </div>
 
@@ -65,42 +56,39 @@ const Login = ({ onLoginSuccess, onGoToRegister }) => {
         <fieldset>
           <div className="form-group">
             <label htmlFor="login-email">Correo Electrónico</label>
-            <input 
-              id="login-email"
-              type="email" 
-              name="email" 
-              value={formData.email} 
-              onChange={handleChange}
-              required
+            <input
+              id="login-email" type="email" name="email"
+              value={formData.email} onChange={handleChange}
+              required autoComplete="email"
               data-testid="input-login-email"
             />
           </div>
-
           <div className="form-group">
             <label htmlFor="login-password">Contraseña</label>
-            <input 
-              id="login-password"
-              type="password" 
-              name="password" 
-              value={formData.password} 
-              onChange={handleChange}
-              required
+            <input
+              id="login-password" type="password" name="password"
+              value={formData.password} onChange={handleChange}
+              required autoComplete="current-password"
               data-testid="input-login-password"
             />
           </div>
         </fieldset>
 
-        <button type="submit" className="btn-primary full-width" disabled={isLoading} data-testid="submit-login-btn">
+        <button
+          type="submit"
+          className="btn-primary full-width"
+          disabled={isLoading}
+          data-testid="submit-login-btn"
+        >
           {isLoading ? 'Autenticando...' : 'Ingresar'}
         </button>
 
         <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
           <p className="text-small text-secondary">
             ¿No tienes una cuenta?{' '}
-            <button 
-              type="button" 
-              className="btn-link" 
-              style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline' }}
+            <button
+              type="button"
+              style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline', fontSize: 'inherit' }}
               onClick={onGoToRegister}
             >
               Registra tu organización

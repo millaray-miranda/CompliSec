@@ -3,69 +3,70 @@ import axios from '../../utils/axiosSetup';
 import AssetForm from './AssetForm';
 
 /**
- * Componente que muestra el inventario de activos de informacion.
- * Permite visualizar y añadir nuevos activos a la organizacion.
- *
- * @param {Object} props - Propiedades del componente.
- * @param {string} props.organizationId - El ID de la organizacion actual.
- * @returns {JSX.Element} El componente de inventario de activos.
+ * Inventario de activos de información (ISO 27001 — A.8).
+ * Muestra los activos de la organización y permite registrar nuevos.
  */
 const AssetList = ({ organizationId }) => {
-  const [assets, setAssets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [error, setError] = useState('');
+  const [assets, setAssets]       = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [showForm, setShowForm]   = useState(false);
+  const [error, setError]         = useState('');
 
-  /**
-   * Obtiene la lista de activos desde el BFF (Backend for Frontend).
-   */
   const fetchAssets = async () => {
     setLoading(true);
+    setError('');
     try {
-      const response = await axios.get(`http://localhost:4000/api/assets?organization_id=${organizationId}`);
-      setAssets(response.data.data);
+      const response = await axios.get(`/api/assets?organization_id=${organizationId}`);
+      setAssets(response.data.data || []);
     } catch (err) {
-      setError('Error al cargar los activos.');
+      setError('Error al cargar los activos. Verifique la conexión con el servidor.');
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Efecto secundario para cargar activos cuando cambia la organizacion
   useEffect(() => {
-    fetchAssets();
+    if (organizationId) fetchAssets();
   }, [organizationId]);
 
-  /**
-   * Maneja el evento de creacion exitosa de un nuevo activo.
-   * Agrega el activo al estado local para evitar una recarga completa.
-   *
-   * @param {Object} newAsset - El activo recien creado.
-   */
   const handleAssetCreated = (newAsset) => {
-    setAssets([newAsset, ...assets]);
+    setAssets(prev => [newAsset, ...prev]);
     setShowForm(false);
+  };
+
+  const getCiaClass = (sum) => {
+    if (sum >= 12) return 'risk-high';
+    if (sum >= 8)  return 'risk-medium';
+    return 'risk-low';
+  };
+
+  const getCiaLabel = (sum) => {
+    if (sum >= 12) return 'ALTA';
+    if (sum >= 8)  return 'MEDIA';
+    return 'BAJA';
   };
 
   return (
     <div className="assets-container">
       <div className="section-header">
-        <h2>Inventario de Activos</h2>
-        <button 
-          className="btn-primary" 
-          onClick={() => setShowForm(!showForm)}
+        <div>
+          <h2>Inventario de Activos</h2>
+          <p className="text-secondary text-small" style={{ margin: '0.25rem 0 0' }}>
+            Cláusula A.8 — {assets.length} activo{assets.length !== 1 ? 's' : ''} registrado{assets.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <button
+          className="btn-primary"
+          onClick={() => setShowForm(prev => !prev)}
           data-testid="toggle-asset-form"
         >
-          {showForm ? 'Cancelar' : 'Registrar Nuevo Activo'}
+          {showForm ? 'Cancelar' : '+ Registrar Activo'}
         </button>
       </div>
 
       {showForm && (
-        <AssetForm 
-          organizationId={organizationId} 
-          onSuccess={handleAssetCreated} 
-        />
+        <AssetForm organizationId={organizationId} onSuccess={handleAssetCreated} />
       )}
 
       {error && <div className="alert-error">{error}</div>}
@@ -73,14 +74,22 @@ const AssetList = ({ organizationId }) => {
       {!showForm && (
         <div className="glass-panel">
           {loading ? (
-            <p>Cargando activos...</p>
+            <div className="loading-container"><p>Cargando activos...</p></div>
           ) : assets.length === 0 ? (
-            <p className="subtitle text-center">No hay activos registrados aún. Comienza añadiendo tus sistemas y datos críticos.</p>
+            <div style={{ textAlign: 'center', padding: '3rem' }}>
+              <p className="text-secondary" style={{ marginBottom: '1rem' }}>
+                No hay activos registrados. Comienza añadiendo tus sistemas y datos críticos.
+              </p>
+              <button className="btn-primary" onClick={() => setShowForm(true)}>
+                Registrar primer activo
+              </button>
+            </div>
           ) : (
             <table className="assets-table" data-testid="assets-table">
               <thead>
                 <tr>
                   <th>Nombre del Activo</th>
+                  <th>Descripción</th>
                   <th>Puntaje C-I-A</th>
                   <th>Criticidad</th>
                 </tr>
@@ -88,23 +97,24 @@ const AssetList = ({ organizationId }) => {
               <tbody>
                 {assets.map(asset => {
                   const ciaSum = asset.confidentiality_req + asset.integrity_req + asset.availability_req;
-                  const criticalityClass = ciaSum >= 12 ? 'risk-high' : ciaSum >= 8 ? 'risk-medium' : 'risk-low';
-                  const criticalityLabel = ciaSum >= 12 ? 'ALTA' : ciaSum >= 8 ? 'MEDIA' : 'BAJA';
-
                   return (
                     <tr key={asset.id} data-testid={`asset-row-${asset.id}`}>
                       <td>
                         <strong>{asset.name}</strong>
-                        {asset.description && <p className="text-small text-secondary">{asset.description}</p>}
                       </td>
                       <td>
-                        <span className="badge">C:{asset.confidentiality_req}</span>
-                        <span className="badge">I:{asset.integrity_req}</span>
+                        <span className="text-secondary text-small">
+                          {asset.description || '—'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="badge" style={{ marginRight: '0.25rem' }}>C:{asset.confidentiality_req}</span>
+                        <span className="badge" style={{ marginRight: '0.25rem' }}>I:{asset.integrity_req}</span>
                         <span className="badge">A:{asset.availability_req}</span>
                       </td>
                       <td>
-                        <span className={`status-badge risk-score ${criticalityClass}`}>
-                          {criticalityLabel} ({ciaSum})
+                        <span className={`status-badge ${getCiaClass(ciaSum)}`}>
+                          {getCiaLabel(ciaSum)} ({ciaSum})
                         </span>
                       </td>
                     </tr>

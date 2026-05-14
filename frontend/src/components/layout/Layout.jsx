@@ -1,48 +1,62 @@
 import React from 'react';
 
 /**
- * Componente de diseño (Layout) que envuelve las vistas principales de la aplicacion.
- * Proporciona la estructura general, incluyendo el encabezado y el pie de pagina.
- *
- * @param {Object} props - Las propiedades del componente.
- * @param {React.ReactNode} props.children - Los elementos hijos a renderizar dentro del layout.
- * @param {Object} [props.user] - El usuario actual (opcional).
- * @param {Function} [props.onLogout] - Función para cerrar sesión (opcional).
- * @returns {JSX.Element} La estructura de diseño de la aplicacion.
+ * Layout general de la aplicación.
+ * Muestra el nombre y rol del usuario autenticado si existen.
  */
 const Layout = ({ children, user, onLogout }) => {
+  const initials = user?.name
+    ? user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+    : '?';
+
   return (
     <div className="app-layout">
       <header className="app-header">
         <div className="logo-container">
-          <div className="logo-icon"></div>
           <h1>CompliSec</h1>
+          <span className="badge">ISO/IEC 27001</span>
         </div>
+
         <nav className="header-nav" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <span className="badge">Plataforma ISO/IEC 27001</span>
-          {user && (
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginLeft: '1rem', paddingLeft: '1rem', borderLeft: '1px solid var(--border)' }}>
-              <span className="text-small" style={{ color: 'var(--text-light)' }}>
-                {user.name} ({user.role})
-              </span>
-              <button 
-                onClick={onLogout} 
-                style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.9rem' }}
+          {user ? (
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <div className="avatar" title={user.name}>{initials}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>{user.name}</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {user.role}
+                </span>
+              </div>
+              <button
+                onClick={onLogout}
+                style={{
+                  background: 'none',
+                  border: '1px solid rgba(239,68,68,0.4)',
+                  color: 'var(--danger)',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem',
+                  padding: '0.3rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  transition: 'background 0.2s',
+                }}
+                onMouseEnter={e => e.target.style.background = 'rgba(239,68,68,0.1)'}
+                onMouseLeave={e => e.target.style.background = 'none'}
               >
                 Cerrar sesión
               </button>
             </div>
+          ) : (
+            <span className="badge">Plataforma ISO/IEC 27001</span>
           )}
         </nav>
       </header>
-      
+
       <main className="app-content">
         {children}
       </main>
 
       <footer className="app-footer">
-        <p>&copy; 2026 CompliSec SaaS. Todos los derechos reservados.</p>
-        <p className="text-secondary">Cumplimiento Simplificado para Pymes</p>
+        <p>© 2026 CompliSec SaaS — Cumplimiento Simplificado para Pymes</p>
       </footer>
     </div>
   );

@@ -2,48 +2,29 @@ import React, { useState } from 'react';
 import axios from '../../utils/axiosSetup';
 
 /**
- * Formulario para registrar un nuevo activo de informacion.
- *
- * @param {Object} props - Propiedades del componente.
- * @param {string} props.organizationId - El ID de la organizacion actual.
- * @param {Function} props.onSuccess - Callback que se ejecuta cuando el activo se crea exitosamente.
- * @returns {JSX.Element} El componente del formulario de activos.
+ * Formulario para registrar un activo de información.
+ * Evalúa confidencialidad, integridad y disponibilidad (C-I-A).
  */
 const AssetForm = ({ organizationId, onSuccess }) => {
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    confidentiality_req: 3,
-    integrity_req: 3,
-    availability_req: 3,
-    organization_id: organizationId
+    name:                 '',
+    description:          '',
+    confidentiality_req:  3,
+    integrity_req:        3,
+    availability_req:     3,
+    organization_id:      organizationId,
   });
 
-  const [formErrors, setFormErrors] = useState({});
+  const [formErrors, setFormErrors]   = useState({});
   const [serverError, setServerError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  /**
-   * Maneja el cambio de los valores del formulario.
-   *
-   * @param {React.ChangeEvent<HTMLInputElement>} e - Evento de cambio del input.
-   */
   const handleChange = (e) => {
     const { name, value, type } = e.target;
-    const parsedValue = type === 'range' ? parseInt(value, 10) : value;
-    
-    setFormData(prev => ({ ...prev, [name]: parsedValue }));
-    
-    if (formErrors[name]) {
-      setFormErrors(prev => ({ ...prev, [name]: null }));
-    }
+    setFormData(prev => ({ ...prev, [name]: type === 'range' ? parseInt(value, 10) : value }));
+    if (formErrors[name]) setFormErrors(prev => ({ ...prev, [name]: null }));
   };
 
-  /**
-   * Envía el formulario al BFF y maneja la respuesta o los errores de validacion.
-   *
-   * @param {React.FormEvent} e - Evento de envio del formulario.
-   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -51,89 +32,93 @@ const AssetForm = ({ organizationId, onSuccess }) => {
     setServerError('');
 
     try {
-      const response = await axios.post('http://localhost:4000/api/assets', formData);
+      const response = await axios.post('/api/assets', formData);
       if (response.status === 201) {
         onSuccess(response.data.data);
       }
     } catch (error) {
-      if (error.response && error.response.status === 400 && error.response.data.details) {
-        const errorsMap = {};
-        error.response.data.details.forEach(err => {
-          errorsMap[err.path] = err.message;
-        });
-        setFormErrors(errorsMap);
-      } else if (error.response && error.response.data.message) {
-        setServerError(error.response.data.message);
+      if (error.response?.status === 400 && error.response.data.details) {
+        const map = {};
+        error.response.data.details.forEach(e => { map[e.path] = e.message; });
+        setFormErrors(map);
       } else {
-        setServerError('Ocurrió un error inesperado. Por favor, inténtelo de nuevo más tarde.');
+        setServerError(error.response?.data?.message || 'Error inesperado. Inténtelo de nuevo.');
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const riskScore = formData.confidentiality_req + formData.integrity_req + formData.availability_req;
+  const scoreColor = riskScore >= 12 ? 'var(--danger)' : riskScore >= 8 ? 'var(--warning)' : 'var(--success)';
+
   return (
     <div className="glass-panel" style={{ marginBottom: '2rem' }}>
       <form onSubmit={handleSubmit} data-testid="asset-form">
         <fieldset>
           <legend>Registrar Activo de Información</legend>
-          
+
           {serverError && <div className="alert-error">{serverError}</div>}
 
           <div className="form-group">
-            <label htmlFor="asset-name">Nombre del Activo</label>
-            <input 
-              id="asset-name"
-              type="text" 
-              name="name" 
-              value={formData.name} 
-              onChange={handleChange}
-              className={formErrors['name'] ? 'input-error' : ''}
+            <label htmlFor="asset-name">Nombre del Activo *</label>
+            <input
+              id="asset-name" type="text" name="name"
+              value={formData.name} onChange={handleChange}
+              className={formErrors.name ? 'input-error' : ''}
+              placeholder="Ej: Base de datos de clientes, Servidor web..."
               data-testid="input-asset-name"
             />
-            {formErrors['name'] && <span className="error-text" data-testid="error-asset-name">{formErrors['name']}</span>}
+            {formErrors.name && <span className="error-text" data-testid="error-asset-name">{formErrors.name}</span>}
           </div>
 
           <div className="form-group">
             <label htmlFor="asset-desc">Descripción</label>
-            <input 
-              id="asset-desc"
-              type="text" 
-              name="description" 
-              value={formData.description} 
-              onChange={handleChange}
+            <input
+              id="asset-desc" type="text" name="description"
+              value={formData.description} onChange={handleChange}
+              placeholder="Descripción breve del activo..."
               data-testid="input-asset-desc"
             />
           </div>
 
-          <div className="metrics" style={{ marginTop: '1.5rem', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.1)' }}>
-            <div className="form-group">
-              <label>Confidencialidad (1-5): {formData.confidentiality_req}</label>
-              <input 
-                type="range" min="1" max="5" name="confidentiality_req" 
-                value={formData.confidentiality_req} onChange={handleChange}
-                data-testid="slider-asset-c"
-              />
+          {/* Sliders C-I-A */}
+          <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '0.75rem', padding: '1rem', marginTop: '0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
+              <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Valoración C-I-A</span>
+              <span style={{ fontWeight: 700, color: scoreColor }}>
+                Criticidad: {riskScore}/15
+              </span>
             </div>
-            <div className="form-group">
-              <label>Integridad (1-5): {formData.integrity_req}</label>
-              <input 
-                type="range" min="1" max="5" name="integrity_req" 
-                value={formData.integrity_req} onChange={handleChange}
-                data-testid="slider-asset-i"
-              />
-            </div>
-            <div className="form-group">
-              <label>Disponibilidad (1-5): {formData.availability_req}</label>
-              <input 
-                type="range" min="1" max="5" name="availability_req" 
-                value={formData.availability_req} onChange={handleChange}
-                data-testid="slider-asset-a"
-              />
-            </div>
+
+            {[
+              { name: 'confidentiality_req', label: 'Confidencialidad', hint: 'Impacto si los datos son expuestos' },
+              { name: 'integrity_req',       label: 'Integridad',       hint: 'Impacto si los datos son alterados' },
+              { name: 'availability_req',    label: 'Disponibilidad',   hint: 'Impacto si el activo deja de funcionar' },
+            ].map(({ name, label, hint }) => (
+              <div className="form-group" key={name} style={{ marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <label style={{ marginBottom: 0 }}>{label}</label>
+                  <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{formData[name]}/5</span>
+                </div>
+                <input
+                  type="range" min="1" max="5" name={name}
+                  value={formData[name]} onChange={handleChange}
+                  style={{ width: '100%' }}
+                  data-testid={`slider-asset-${name[0]}`}
+                />
+                <span className="text-secondary text-small">{hint}</span>
+              </div>
+            ))}
           </div>
 
-          <button type="submit" className="btn-primary full-width" disabled={isSubmitting} data-testid="submit-asset-btn">
+          <button
+            type="submit"
+            className="btn-primary full-width"
+            disabled={isSubmitting}
+            data-testid="submit-asset-btn"
+            style={{ marginTop: '1rem' }}
+          >
             {isSubmitting ? 'Guardando...' : 'Guardar Activo'}
           </button>
         </fieldset>

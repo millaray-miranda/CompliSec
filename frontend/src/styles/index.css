@@ -27,6 +27,7 @@ body {
   min-height: 100vh;
 }
 
+/* ── Header ── */
 .app-header {
   display: flex;
   justify-content: space-between;
@@ -35,6 +36,9 @@ body {
   background: var(--panel-bg);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .logo-container {
@@ -95,8 +99,11 @@ body {
   align-items: center;
   justify-content: center;
   font-weight: bold;
+  font-size: 0.85rem;
+  color: white;
 }
 
+/* ── Layout ── */
 .main-content {
   flex: 1;
   padding: 2rem;
@@ -106,12 +113,40 @@ body {
   box-sizing: border-box;
 }
 
+/* ── Dashboard ── */
+.dashboard-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.summary-card {
+  text-align: center;
+  padding: 1.25rem;
+}
+
+.summary-card .big-number {
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.summary-card .card-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 2rem;
 }
 
+/* ── Glass panel ── */
 .glass-panel {
   background: var(--panel-bg);
   backdrop-filter: blur(10px);
@@ -121,6 +156,7 @@ body {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
+/* ── Risk cards ── */
 .risk-card {
   display: flex;
   flex-direction: column;
@@ -144,18 +180,51 @@ body {
   font-size: 1.25rem;
 }
 
+/* ── Status badges ── */
+/* Usado con .status-badge + clase de estado (ambas variantes de nombre) */
 .status-badge {
   padding: 0.25rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
+  display: inline-block;
 }
 
-.status-badge.implemented { background: rgba(16, 185, 129, 0.2); color: var(--success); }
-.status-badge.partial { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
-.status-badge.not_implemented { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+/* Variante con guión (usada en SoAList) */
+.status-badge.status-implemented,
+.status-badge.implemented {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--success);
+}
 
+.status-badge.status-partial,
+.status-badge.partial {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--warning);
+}
+
+.status-badge.status-missing,
+.status-badge.not_implemented {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+}
+
+/* ── Risk score badges ── */
+.status-badge.risk-high,
+.risk-high .value { color: var(--danger); }
+
+.status-badge.risk-medium,
+.risk-medium .value { color: var(--warning); }
+
+.status-badge.risk-low,
+.risk-low .value  { color: var(--success); }
+
+.status-badge.risk-high  { background: rgba(239, 68, 68, 0.15); }
+.status-badge.risk-medium { background: rgba(245, 158, 11, 0.15); }
+.status-badge.risk-low    { background: rgba(16, 185, 129, 0.15); }
+
+/* ── Metrics ── */
 .control-name {
   color: var(--text-secondary);
   margin: 0 0 1.5rem 0;
@@ -190,10 +259,7 @@ body {
   font-weight: 700;
 }
 
-.risk-score.risk-high .value { color: var(--danger); }
-.risk-score.risk-medium .value { color: var(--warning); }
-.risk-score.risk-low .value { color: var(--success); }
-
+/* ── Card actions ── */
 .card-actions {
   display: flex;
   gap: 1rem;
@@ -210,6 +276,7 @@ body {
   outline: none;
 }
 
+/* ── Buttons ── */
 .btn-primary {
   background: var(--accent);
   color: white;
@@ -218,13 +285,29 @@ body {
   border-radius: 0.5rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, opacity 0.2s;
 }
 
 .btn-primary:hover {
   background: #2563eb;
 }
 
+.btn-primary.outline {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+.btn-primary.outline:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Footer ── */
 .app-footer {
   text-align: center;
   padding: 2rem;
@@ -234,7 +317,7 @@ body {
   margin-top: auto;
 }
 
-/* Onboarding Form Styles */
+/* ── Onboarding & Forms ── */
 .onboarding-container {
   max-width: 600px;
   margin: 2rem auto;
@@ -277,7 +360,9 @@ legend {
   font-weight: 500;
 }
 
-.form-group input, .form-group select {
+.form-group input,
+.form-group select,
+.form-group textarea {
   background: rgba(0,0,0,0.2);
   border: 1px solid var(--border);
   color: var(--text-primary);
@@ -286,9 +371,13 @@ legend {
   outline: none;
   font-size: 1rem;
   transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
+  resize: vertical;
 }
 
-.form-group input:focus, .form-group select:focus {
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
@@ -314,9 +403,85 @@ legend {
   font-size: 0.875rem;
 }
 
+.alert-success {
+  background: rgba(16, 185, 129, 0.1);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+}
+
 .full-width {
   width: 100%;
   padding: 1rem;
   font-size: 1rem;
   margin-top: 1rem;
+}
+
+/* ── Tables ── */
+.assets-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.assets-table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.assets-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  vertical-align: middle;
+}
+
+.assets-table tbody tr:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+.assets-table td strong {
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+/* ── Section headers ── */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.section-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+/* ── Misc helpers ── */
+.text-small   { font-size: 0.8rem; }
+.text-center  { text-align: center; }
+.text-secondary { color: var(--text-secondary); }
+.text-danger  { color: var(--danger); }
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mb-2 { margin-bottom: 1rem; }
+.ml-1 { margin-left: 0.5rem; }
+
+/* ── Loading spinner ── */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 3rem;
+  color: var(--text-secondary);
 }
