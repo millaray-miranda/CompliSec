@@ -53,6 +53,7 @@ body {
   font-weight: 700;
   background: linear-gradient(to right, #60a5fa, #34d399);
   -webkit-background-clip: text;
+  background-clip: text;
   color: transparent;
 }
 
@@ -484,4 +485,114 @@ legend {
   align-items: center;
   padding: 3rem;
   color: var(--text-secondary);
+}
+
+/* ── Password Field ── */
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-wrapper input {
+  width: 100%;
+  padding-right: 2.5rem;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.75rem;
+  background-color: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color 0.2s;
+  height: 100%;
+}
+
+.password-toggle:hover {
+  color: var(--text-primary);
+}
+
+.password-strength-bars {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.strength-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background-color: var(--border);
+  transition: background-color 0.3s;
+}
+
+.strength-bar.active-weak {
+  background-color: var(--danger);
+}
+
+.strength-bar.active-fair {
+  background-color: var(--warning);
+}
+
+.strength-bar.active-good {
+  background-color: #34d399;
+}
+
+.strength-bar.active-strong {
+  background-color: var(--success);
+}
+
+.password-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  transition: color 0.2s;
+}
+
+.check-item.valid {
+  color: var(--success);
+}
+
+.check-circle {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--text-secondary);
+  display: inline-block;
+  position: relative;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.check-item.valid .check-circle {
+  border-color: var(--success);
+  background-color: transparent;
+}
+
+.check-item.valid .check-circle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--success);
 }

@@ -27,6 +27,9 @@ const OnboardingForm = ({ onComplete }) => {
   const [formErrors, setFormErrors] = useState({});
   const [serverError, setServerError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   /**
    * Maneja los cambios en los inputs de la organizacion.
@@ -131,6 +134,37 @@ const OnboardingForm = ({ onComplete }) => {
     }
   };
 
+  const hasMinLength = formData.admin.password.length >= 8;
+  const hasUppercase = /[A-Z]/.test(formData.admin.password);
+  const hasNumber = /[0-9]/.test(formData.admin.password);
+  const hasSymbol = /[!@#$%^&*(),.?":{}|<>_+\-=\[\]\\]/.test(formData.admin.password);
+  const criteriaCount = [hasMinLength, hasUppercase, hasNumber, hasSymbol].filter(Boolean).length;
+
+  const getStrengthClass = (index) => {
+    if (criteriaCount === 0) return '';
+    if (criteriaCount === 1 && index === 0) return 'active-weak';
+    if (criteriaCount === 2 && index < 2) return 'active-fair';
+    if (criteriaCount === 3 && index < 3) return 'active-good';
+    if (criteriaCount === 4 && index < 4) return 'active-strong';
+    return '';
+  };
+
+  const EyeIcon = ({ show }) => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {show ? (
+        <>
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+          <line x1="1" y1="1" x2="23" y2="23"></line>
+        </>
+      ) : (
+        <>
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </>
+      )}
+    </svg>
+  );
+
   return (
     <div className="onboarding-container glass-panel" style={{ maxWidth: '600px', margin: '2rem auto' }}>
       <div className="section-header">
@@ -227,32 +261,76 @@ const OnboardingForm = ({ onComplete }) => {
               <span className="error-text" data-testid="error-admin-email">{formErrors['admin.email']}</span>}
           </div>
 
-          <div className="form-group">
-            <label htmlFor="admin-password">Contraseña</label>
-            <input
-              id="admin-password"
-              type="password"
-              name="password"
-              value={formData.admin.password}
-              onChange={handleAdminChange}
-              className={formErrors['admin.password'] ? 'input-error' : ''}
-              data-testid="input-admin-password"
-            />
+          <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+            <label htmlFor="admin-password">Nueva contraseña</label>
+            <div className="password-wrapper">
+              <input
+                id="admin-password"
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                placeholder="Mínimo 8 caracteres"
+                value={formData.admin.password}
+                onChange={handleAdminChange}
+                className={formErrors['admin.password'] ? 'input-error' : ''}
+                data-testid="input-admin-password"
+              />
+              <button 
+                type="button" 
+                className="password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              >
+                <EyeIcon show={showPassword} />
+              </button>
+            </div>
             {formErrors['admin.password'] &&
               <span className="error-text" data-testid="error-admin-password">{formErrors['admin.password']}</span>}
           </div>
 
-          <div className="form-group">
-            <label htmlFor="admin-confirm-password">Repetir Contraseña</label>
-            <input
-              id="admin-confirm-password"
-              type="password"
-              name="confirmPassword"
-              value={formData.admin.confirmPassword}
-              onChange={handleAdminChange}
-              className={formErrors['admin.confirmPassword'] ? 'input-error' : ''}
-              data-testid="input-admin-confirm-password"
-            />
+          <div className="password-strength-bars">
+            <div className={`strength-bar ${getStrengthClass(0)}`}></div>
+            <div className={`strength-bar ${getStrengthClass(1)}`}></div>
+            <div className={`strength-bar ${getStrengthClass(2)}`}></div>
+            <div className={`strength-bar ${getStrengthClass(3)}`}></div>
+          </div>
+
+          <div className="password-checklist">
+            <div className={`check-item ${hasMinLength ? 'valid' : ''}`}>
+              <span className="check-circle"></span> Mínimo 8 caracteres
+            </div>
+            <div className={`check-item ${hasUppercase ? 'valid' : ''}`}>
+              <span className="check-circle"></span> Al menos una mayúscula
+            </div>
+            <div className={`check-item ${hasNumber ? 'valid' : ''}`}>
+              <span className="check-circle"></span> Al menos un número
+            </div>
+            <div className={`check-item ${hasSymbol ? 'valid' : ''}`}>
+              <span className="check-circle"></span> Al menos un símbolo (!@#$...)
+            </div>
+          </div>
+
+          <div className="form-group" style={{ marginTop: '1rem' }}>
+            <label htmlFor="admin-confirm-password">Confirmar nueva contraseña</label>
+            <div className="password-wrapper">
+              <input
+                id="admin-confirm-password"
+                type={showConfirmPassword ? 'text' : 'password'}
+                name="confirmPassword"
+                placeholder="Repite tu nueva contraseña"
+                value={formData.admin.confirmPassword}
+                onChange={handleAdminChange}
+                className={formErrors['admin.confirmPassword'] ? 'input-error' : ''}
+                data-testid="input-admin-confirm-password"
+              />
+              <button 
+                type="button" 
+                className="password-toggle"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              >
+                <EyeIcon show={showConfirmPassword} />
+              </button>
+            </div>
             {formErrors['admin.confirmPassword'] &&
               <span className="error-text" data-testid="error-admin-confirm-password">{formErrors['admin.confirmPassword']}</span>}
           </div>

@@ -5,24 +5,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>CompliSec — ISO 27001 para Pymes</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Cabinet+Grotesk:wght@400;500;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#04090f;
-  --s1:#081422;
-  --s2:#0b1d33;
-  --border:#0e2540;
-  --green:#00ff88;
-  --green-low:rgba(0,255,136,.07);
-  --cyan:#00cfff;
-  --text:#dff0ff;
-  --muted:#3d6b8a;
+  --bg:#0f172a;
+  --s1:rgba(30, 41, 59, 0.7);
+  --s2:rgba(30, 41, 59, 0.9);
+  --border:rgba(255, 255, 255, 0.1);
+  --green:#3b82f6;
+  --green-low:rgba(59,130,246,.1);
+  --cyan:#34d399;
+  --text:#f8fafc;
+  --muted:#94a3b8;
   --mono:'DM Mono',monospace;
-  --sans:'Cabinet Grotesk','Segoe UI',sans-serif;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 }
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--text);font-family:var(--sans);overflow-x:hidden}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  overflow-x:hidden;
+  background-image: radial-gradient(circle at top right, #1e3a8a 0%, transparent 40%),
+                    radial-gradient(circle at bottom left, #064e3b 0%, transparent 40%);
+  background-attachment: fixed;
+}
 #canvas{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.45}
 
 /* ── NAV ── */
@@ -35,12 +43,20 @@ nav{
 }
 .logo{display:flex;align-items:center;gap:.7rem;text-decoration:none}
 .logo-icon{
-  width:32px;height:32px;background:var(--green);border-radius:7px;
+  width:32px;height:32px;border-radius:7px;
   display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 16px rgba(0,255,136,.4);
+  /* box-shadow:0 0 16px rgba(59,130,246,.4); */
 }
-.logo-name{font-size:1.2rem;font-weight:800;color:var(--text);letter-spacing:-.02em}
-.logo-name em{color:var(--green);font-style:normal}
+.logo-name{
+  font-size:1.5rem;
+  font-weight:700;
+  background:linear-gradient(to right, #60a5fa, #34d399);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  letter-spacing:-.02em;
+}
+.logo-name em{font-style:normal}
 .nav-r{display:flex;align-items:center;gap:2rem}
 .nav-link{color:var(--muted);text-decoration:none;font-size:.85rem;font-weight:500;transition:color .2s}
 .nav-link:hover{color:var(--text)}
@@ -48,10 +64,10 @@ nav{
   background:var(--green);color:#04090f;
   padding:.55rem 1.4rem;border-radius:6px;font-size:.85rem;font-weight:700;
   text-decoration:none;letter-spacing:.02em;
-  box-shadow:0 0 18px rgba(0,255,136,.35);
+  box-shadow:0 0 18px rgba(59,130,246,.35);
   transition:box-shadow .2s,transform .15s;
 }
-.nav-cta:hover{box-shadow:0 0 32px rgba(0,255,136,.6);transform:translateY(-1px)}
+.nav-cta:hover{box-shadow:0 0 32px rgba(59,130,246,.6);transform:translateY(-1px)}
 
 /* ── HERO ── */
 #hero{
@@ -62,7 +78,7 @@ nav{
 }
 .hero-pill{
   display:inline-flex;align-items:center;gap:.5rem;
-  border:1px solid rgba(0,255,136,.25);background:rgba(0,255,136,.05);
+  border:1px solid rgba(59,130,246,.25);background:rgba(59,130,246,.05);
   padding:.35rem 1rem;border-radius:100px;
   font-family:var(--mono);font-size:.7rem;color:var(--green);letter-spacing:.1em;
   margin-bottom:2.5rem;animation:fadeUp .5s ease both;
@@ -91,16 +107,16 @@ h1{
   background:var(--green);color:#04090f;
   padding:.95rem 2.4rem;border-radius:8px;font-weight:800;font-size:1rem;
   text-decoration:none;display:inline-flex;align-items:center;gap:.5rem;
-  box-shadow:0 0 28px rgba(0,255,136,.4);transition:all .2s;
+  box-shadow:0 0 28px rgba(59,130,246,.4);transition:all .2s;
 }
-.btn-main:hover{transform:translateY(-3px);box-shadow:0 0 50px rgba(0,255,136,.6)}
+.btn-main:hover{transform:translateY(-3px);box-shadow:0 0 50px rgba(59,130,246,.6)}
 .btn-outline{
   background:transparent;color:var(--text);
   padding:.95rem 2.4rem;border-radius:8px;font-weight:700;font-size:1rem;
   text-decoration:none;border:1px solid var(--border);
   display:inline-flex;align-items:center;gap:.5rem;transition:all .2s;
 }
-.btn-outline:hover{border-color:rgba(0,255,136,.4);color:var(--green)}
+.btn-outline:hover{border-color:rgba(59,130,246,.4);color:var(--green)}
 
 /* stats */
 .hero-stats{
@@ -140,7 +156,7 @@ section{position:relative;z-index:1;padding:7rem 6%}
   position:relative;overflow:hidden;
   transition:border-color .25s,transform .25s;
 }
-.prob-card:hover{border-color:rgba(0,255,136,.25);transform:translateY(-4px)}
+.prob-card:hover{border-color:rgba(59,130,246,.25);transform:translateY(-4px)}
 .prob-card::before{
   content:'';position:absolute;top:0;left:0;right:0;height:3px;
   background:linear-gradient(90deg,var(--green),transparent);
@@ -164,11 +180,11 @@ section{position:relative;z-index:1;padding:7rem 6%}
   background:linear-gradient(135deg,var(--green-low),transparent);
   opacity:0;transition:opacity .25s;
 }
-.feat-card:hover{border-color:rgba(0,255,136,.3);transform:translateY(-5px);box-shadow:0 20px 40px rgba(0,0,0,.4)}
+.feat-card:hover{border-color:rgba(59,130,246,.3);transform:translateY(-5px);box-shadow:0 20px 40px rgba(0,0,0,.4)}
 .feat-card:hover::after{opacity:1}
 .feat-ico{
   width:44px;height:44px;border-radius:10px;
-  background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.2);
+  background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);
   display:flex;align-items:center;justify-content:center;
   font-size:1.3rem;margin-bottom:1.1rem;position:relative;z-index:1;
 }
@@ -176,7 +192,7 @@ section{position:relative;z-index:1;padding:7rem 6%}
 .feat-card p{font-size:.85rem;color:var(--muted);line-height:1.6;position:relative;z-index:1}
 .feat-tag{
   font-family:var(--mono);font-size:.65rem;color:var(--cyan);
-  background:rgba(0,207,255,.08);border:1px solid rgba(0,207,255,.15);
+  background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.15);
   display:inline-block;padding:2px 7px;border-radius:4px;
   margin-top:.75rem;position:relative;z-index:1;
 }
@@ -202,7 +218,7 @@ section{position:relative;z-index:1;padding:7rem 6%}
   background:var(--bg);border:2px solid var(--green);
   display:flex;align-items:center;justify-content:center;
   font-family:var(--mono);font-size:1.1rem;font-weight:700;color:var(--green);
-  margin-bottom:1.25rem;box-shadow:0 0 20px rgba(0,255,136,.2);
+  margin-bottom:1.25rem;box-shadow:0 0 20px rgba(59,130,246,.2);
 }
 .step h3{font-size:.95rem;font-weight:700;margin-bottom:.5rem}
 .step p{font-size:.82rem;color:var(--muted);line-height:1.6}
@@ -219,10 +235,10 @@ section{position:relative;z-index:1;padding:7rem 6%}
   border-radius:12px;padding:1.1rem 1.4rem;cursor:pointer;
   transition:all .2s;text-align:left;
 }
-.dtab:hover{border-color:rgba(0,255,136,.2)}
+.dtab:hover{border-color:rgba(59,130,246,.2)}
 .dtab.active{
-  border-color:var(--green);background:rgba(0,255,136,.06);
-  box-shadow:0 0 20px rgba(0,255,136,.08);
+  border-color:var(--green);background:rgba(59,130,246,.06);
+  box-shadow:0 0 20px rgba(59,130,246,.08);
 }
 .dtab-num{font-family:var(--mono);font-size:.65rem;color:var(--green);margin-bottom:.35rem;letter-spacing:.08em}
 .dtab h3{font-size:.95rem;font-weight:700;margin-bottom:.3rem}
@@ -232,7 +248,7 @@ section{position:relative;z-index:1;padding:7rem 6%}
 .demo-screen{
   background:var(--s1);border:1px solid var(--border);
   border-radius:16px;overflow:hidden;
-  box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 1px rgba(0,255,136,.05);
+  box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 1px rgba(59,130,246,.05);
   min-height:420px;
 }
 .demo-titlebar{
@@ -272,7 +288,7 @@ section{position:relative;z-index:1;padding:7rem 6%}
 .chip{font-size:.65rem;padding:2px 7px;border-radius:4px;font-family:var(--mono);display:inline-block}
 .chip-r{background:rgba(255,100,100,.15);color:#ff6b6b}
 .chip-y{background:rgba(255,180,0,.15);color:#ffb800}
-.chip-g{background:rgba(0,255,136,.12);color:var(--green)}
+.chip-g{background:rgba(59,130,246,.12);color:var(--green)}
 .soa-row{
   display:flex;align-items:center;gap:.75rem;
   background:rgba(0,0,0,.2);border-radius:8px;padding:.55rem .8rem;margin-bottom:.45rem;
@@ -294,8 +310,8 @@ section{position:relative;z-index:1;padding:7rem 6%}
 .price-card:hover{transform:translateY(-4px)}
 .price-card.featured{
   border-color:var(--green);
-  background:linear-gradient(160deg,rgba(0,255,136,.05),var(--s1));
-  box-shadow:0 0 40px rgba(0,255,136,.12);
+  background:linear-gradient(160deg,rgba(59,130,246,.05),var(--s1));
+  box-shadow:0 0 40px rgba(59,130,246,.12);
 }
 .price-popular{
   position:absolute;top:-14px;left:50%;transform:translateX(-50%);
@@ -323,13 +339,13 @@ section{position:relative;z-index:1;padding:7rem 6%}
 }
 .btn-price-ol{border:1px solid var(--border);color:var(--text)}
 .btn-price-ol:hover{border-color:var(--green);color:var(--green)}
-.btn-price-solid{background:var(--green);color:#04090f;box-shadow:0 0 20px rgba(0,255,136,.3)}
-.btn-price-solid:hover{box-shadow:0 0 35px rgba(0,255,136,.5)}
+.btn-price-solid{background:var(--green);color:#04090f;box-shadow:0 0 20px rgba(59,130,246,.3)}
+.btn-price-solid:hover{box-shadow:0 0 35px rgba(59,130,246,.5)}
 
 /* ── CTA ── */
 #cta{
   text-align:center;
-  background:radial-gradient(ellipse 80% 60% at 50% 100%,rgba(0,255,136,.07),transparent);
+  background:radial-gradient(ellipse 80% 60% at 50% 100%,rgba(59,130,246,.07),transparent);
   border-top:1px solid var(--border);
 }
 #cta h2{font-size:clamp(2.2rem,5vw,4rem);font-weight:900;letter-spacing:-.04em;line-height:1.05;margin-bottom:1.25rem}
@@ -349,7 +365,7 @@ footer{
 .f-copy{font-family:var(--mono);font-size:.7rem;color:var(--muted)}
 .f-tag{
   font-family:var(--mono);font-size:.68rem;color:var(--green);
-  border:1px solid rgba(0,255,136,.2);background:rgba(0,255,136,.05);
+  border:1px solid rgba(59,130,246,.2);background:rgba(59,130,246,.05);
   padding:.25rem .7rem;border-radius:4px;
 }
 
@@ -379,10 +395,11 @@ footer{
 <nav>
   <a href="#" class="logo">
     <div class="logo-icon">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <!-- <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
         <path d="M12 2L4 6v6c0 5.5 3.5 10.7 8 12 4.5-1.3 8-6.5 8-12V6L12 2z" fill="#04090f"/>
         <path d="M9 12l2 2 4-4" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      </svg> -->
+      <img src="/logo.png" alt="CompliSec Logo" width="40" height="40">
     </div>
     <span class="logo-name">Compli<em>Sec</em></span>
   </a>
@@ -643,12 +660,12 @@ function draw(){
     if(p.x<0||p.x>W)p.vx*=-1;
     if(p.y<0||p.y>H)p.vy*=-1;
     ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-    ctx.fillStyle='rgba(0,255,136,.5)';ctx.fill();
+    ctx.fillStyle='rgba(59,130,246,.5)';ctx.fill();
   });
   for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
     const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.sqrt(dx*dx+dy*dy);
     if(d<130){ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);
-      ctx.strokeStyle=`rgba(0,255,136,${.13*(1-d/130)})`;ctx.lineWidth=.6;ctx.stroke();}
+      ctx.strokeStyle=`rgba(59,130,246,${.13*(1-d/130)})`;ctx.lineWidth=.6;ctx.stroke();}
   }
   requestAnimationFrame(draw);
 }
