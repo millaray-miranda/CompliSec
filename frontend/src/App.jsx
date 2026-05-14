@@ -12,7 +12,10 @@ import Dashboard from './components/dashboard/Dashboard';
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [authView, setAuthView] = useState('login'); // 'login' | 'register'
+  const [authView, setAuthView] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('view') === 'register' ? 'register' : 'login';
+  });
   const [currentView, setCurrentView] = useState('dashboard');
 
   useEffect(() => {
