@@ -1,8 +1,10 @@
 import axios from 'axios';
 
-// En desarrollo apunta al BFF. En Docker/producción usa rutas relativas
-// VITE_BFF_URL se define en .env o docker-compose como variable de entorno
-axios.defaults.baseURL = import.meta.env.VITE_BFF_URL || 'http://localhost:4000';
+// Sin baseURL: Vite proxy redirige /api → http://bff:4000 en Docker
+// En desarrollo local sin Docker, define VITE_BFF_URL=http://localhost:4000 en un .env
+if (import.meta.env.VITE_BFF_URL) {
+  axios.defaults.baseURL = import.meta.env.VITE_BFF_URL;
+}
 
 // Interceptor: inyecta el JWT en cada petición autenticada
 axios.interceptors.request.use(

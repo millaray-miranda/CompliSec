@@ -73,10 +73,11 @@ const OnboardingForm = ({ onComplete }) => {
     setServerError('');
 
     try {
-      const response = await axios.post('http://localhost:4000/api/onboarding', formData);
-      
+      const response = await axios.post('/api/onboarding', formData);
+
       if (response.status === 201) {
-        onComplete({ organizationId: response.data.data.id });
+        // Pasar todos los datos que necesita App.jsx: token, user y organizationId
+        onComplete(response.data.data);
       }
     } catch (error) {
       if (error.response && error.response.status === 400 && error.response.data.details) {

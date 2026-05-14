@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CompliSec — ISO 27001 para Pymes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Cabinet+Grotesk:wght@400;500;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#04090f;
+  --s1:#081422;
+  --s2:#0b1d33;
+  --border:#0e2540;
+  --green:#00ff88;
+  --green-low:rgba(0,255,136,.07);
+  --cyan:#00cfff;
+  --text:#dff0ff;
+  --muted:#3d6b8a;
+  --mono:'DM Mono',monospace;
+  --sans:'Cabinet Grotesk','Segoe UI',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);overflow-x:hidden}
+#canvas{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.45}
+
+/* ── NAV ── */
+nav{
+  position:fixed;top:0;width:100%;z-index:200;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.1rem 6%;
+  background:rgba(4,9,15,.85);backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--border);
+}
+.logo{display:flex;align-items:center;gap:.7rem;text-decoration:none}
+.logo-icon{
+  width:32px;height:32px;background:var(--green);border-radius:7px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 16px rgba(0,255,136,.4);
+}
+.logo-name{font-size:1.2rem;font-weight:800;color:var(--text);letter-spacing:-.02em}
+.logo-name em{color:var(--green);font-style:normal}
+.nav-r{display:flex;align-items:center;gap:2rem}
+.nav-link{color:var(--muted);text-decoration:none;font-size:.85rem;font-weight:500;transition:color .2s}
+.nav-link:hover{color:var(--text)}
+.nav-cta{
+  background:var(--green);color:#04090f;
+  padding:.55rem 1.4rem;border-radius:6px;font-size:.85rem;font-weight:700;
+  text-decoration:none;letter-spacing:.02em;
+  box-shadow:0 0 18px rgba(0,255,136,.35);
+  transition:box-shadow .2s,transform .15s;
+}
+.nav-cta:hover{box-shadow:0 0 32px rgba(0,255,136,.6);transform:translateY(-1px)}
+
+/* ── HERO ── */
+#hero{
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:8rem 6% 5rem;text-align:center;
+  position:relative;z-index:1;
+}
+.hero-pill{
+  display:inline-flex;align-items:center;gap:.5rem;
+  border:1px solid rgba(0,255,136,.25);background:rgba(0,255,136,.05);
+  padding:.35rem 1rem;border-radius:100px;
+  font-family:var(--mono);font-size:.7rem;color:var(--green);letter-spacing:.1em;
+  margin-bottom:2.5rem;animation:fadeUp .5s ease both;
+}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.8s ease infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+h1{
+  font-size:clamp(3rem,7.5vw,6rem);font-weight:900;line-height:1.0;
+  letter-spacing:-.04em;max-width:920px;
+  animation:fadeUp .55s .08s ease both;
+}
+.h1-grad{
+  background:linear-gradient(90deg,var(--green) 0%,var(--cyan) 100%);
+  -webkit-background-clip:text;color:transparent;display:block;
+}
+.hero-p{
+  font-size:1.15rem;color:var(--muted);max-width:560px;
+  line-height:1.75;margin:1.75rem auto 3rem;
+  animation:fadeUp .55s .16s ease both;
+}
+.hero-btns{
+  display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;
+  animation:fadeUp .55s .24s ease both;
+}
+.btn-main{
+  background:var(--green);color:#04090f;
+  padding:.95rem 2.4rem;border-radius:8px;font-weight:800;font-size:1rem;
+  text-decoration:none;display:inline-flex;align-items:center;gap:.5rem;
+  box-shadow:0 0 28px rgba(0,255,136,.4);transition:all .2s;
+}
+.btn-main:hover{transform:translateY(-3px);box-shadow:0 0 50px rgba(0,255,136,.6)}
+.btn-outline{
+  background:transparent;color:var(--text);
+  padding:.95rem 2.4rem;border-radius:8px;font-weight:700;font-size:1rem;
+  text-decoration:none;border:1px solid var(--border);
+  display:inline-flex;align-items:center;gap:.5rem;transition:all .2s;
+}
+.btn-outline:hover{border-color:rgba(0,255,136,.4);color:var(--green)}
+
+/* stats */
+.hero-stats{
+  display:flex;gap:4rem;margin-top:5rem;justify-content:center;
+  border-top:1px solid var(--border);padding-top:3rem;flex-wrap:wrap;
+  animation:fadeUp .55s .32s ease both;
+}
+.stat-item{text-align:center}
+.stat-num{
+  font-family:var(--mono);font-size:2.2rem;font-weight:700;
+  color:var(--green);display:block;
+}
+.stat-lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:.3rem}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+
+/* ── SECCIONES ── */
+section{position:relative;z-index:1;padding:7rem 6%}
+.sec-label{
+  font-family:var(--mono);font-size:.72rem;color:var(--green);
+  letter-spacing:.14em;text-transform:uppercase;display:block;margin-bottom:1rem;
+}
+.sec-h{
+  font-size:clamp(1.9rem,3.5vw,2.8rem);font-weight:800;
+  letter-spacing:-.03em;line-height:1.15;margin-bottom:.9rem;
+}
+.sec-p{font-size:1rem;color:var(--muted);max-width:520px;line-height:1.7}
+
+/* ── PROBLEMA ── */
+#problema{background:var(--s1)}
+.problem-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-top:4rem;
+}
+.prob-card{
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:16px;padding:1.75rem;
+  position:relative;overflow:hidden;
+  transition:border-color .25s,transform .25s;
+}
+.prob-card:hover{border-color:rgba(0,255,136,.25);transform:translateY(-4px)}
+.prob-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--green),transparent);
+}
+.prob-card .pico{font-size:2rem;margin-bottom:1rem;display:block}
+.prob-card h3{font-size:1rem;font-weight:700;margin-bottom:.6rem}
+.prob-card p{font-size:.85rem;color:var(--muted);line-height:1.65}
+
+/* ── FEATURES ── */
+.feat-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin-top:4rem;
+}
+.feat-card{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:16px;padding:1.75rem;
+  transition:border-color .25s,transform .25s,box-shadow .25s;
+  position:relative;overflow:hidden;
+}
+.feat-card::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,var(--green-low),transparent);
+  opacity:0;transition:opacity .25s;
+}
+.feat-card:hover{border-color:rgba(0,255,136,.3);transform:translateY(-5px);box-shadow:0 20px 40px rgba(0,0,0,.4)}
+.feat-card:hover::after{opacity:1}
+.feat-ico{
+  width:44px;height:44px;border-radius:10px;
+  background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.3rem;margin-bottom:1.1rem;position:relative;z-index:1;
+}
+.feat-card h3{font-size:1rem;font-weight:700;margin-bottom:.5rem;position:relative;z-index:1}
+.feat-card p{font-size:.85rem;color:var(--muted);line-height:1.6;position:relative;z-index:1}
+.feat-tag{
+  font-family:var(--mono);font-size:.65rem;color:var(--cyan);
+  background:rgba(0,207,255,.08);border:1px solid rgba(0,207,255,.15);
+  display:inline-block;padding:2px 7px;border-radius:4px;
+  margin-top:.75rem;position:relative;z-index:1;
+}
+
+/* ── CÓMO FUNCIONA ── */
+#como{background:var(--s1)}
+.steps{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:0;margin-top:4rem;position:relative;
+}
+.steps::before{
+  content:'';position:absolute;
+  top:31px;left:12.5%;right:12.5%;height:1px;
+  background:linear-gradient(90deg,transparent,var(--green),var(--cyan),transparent);
+  z-index:0;
+}
+.step{
+  display:flex;flex-direction:column;align-items:center;
+  text-align:center;padding:0 1rem;position:relative;z-index:1;
+}
+.step-num{
+  width:62px;height:62px;border-radius:50%;
+  background:var(--bg);border:2px solid var(--green);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:1.1rem;font-weight:700;color:var(--green);
+  margin-bottom:1.25rem;box-shadow:0 0 20px rgba(0,255,136,.2);
+}
+.step h3{font-size:.95rem;font-weight:700;margin-bottom:.5rem}
+.step p{font-size:.82rem;color:var(--muted);line-height:1.6}
+
+/* ── DEMO ── */
+#demo{}
+.demo-wrap{
+  display:grid;grid-template-columns:1fr 1.4fr;gap:4rem;
+  align-items:start;margin-top:4rem;
+}
+.demo-tabs{display:flex;flex-direction:column;gap:.75rem}
+.dtab{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:12px;padding:1.1rem 1.4rem;cursor:pointer;
+  transition:all .2s;text-align:left;
+}
+.dtab:hover{border-color:rgba(0,255,136,.2)}
+.dtab.active{
+  border-color:var(--green);background:rgba(0,255,136,.06);
+  box-shadow:0 0 20px rgba(0,255,136,.08);
+}
+.dtab-num{font-family:var(--mono);font-size:.65rem;color:var(--green);margin-bottom:.35rem;letter-spacing:.08em}
+.dtab h3{font-size:.95rem;font-weight:700;margin-bottom:.3rem}
+.dtab p{font-size:.8rem;color:var(--muted);line-height:1.5}
+.dtab:not(.active) h3,.dtab:not(.active) .dtab-num{color:var(--muted)}
+
+.demo-screen{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:16px;overflow:hidden;
+  box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 1px rgba(0,255,136,.05);
+  min-height:420px;
+}
+.demo-titlebar{
+  background:rgba(0,0,0,.4);border-bottom:1px solid var(--border);
+  padding:.7rem 1rem;display:flex;align-items:center;gap:.5rem;
+}
+.dtb-dot{width:10px;height:10px;border-radius:50%}
+.dtb-url{
+  flex:1;margin-left:.5rem;background:rgba(0,0,0,.3);border-radius:4px;
+  font-family:var(--mono);font-size:.7rem;color:var(--muted);padding:.25rem .75rem;
+}
+.demo-body{padding:1.5rem;animation:fadeIn .35s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.dpanel-title{
+  font-size:.72rem;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.08em;
+  margin-bottom:1rem;font-family:var(--mono);
+}
+.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1.25rem}
+.kpi{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;padding:.9rem;text-align:center}
+.kpi-n{font-family:var(--mono);font-size:1.6rem;font-weight:700;display:block}
+.kpi-l{font-size:.65rem;color:var(--muted);margin-top:.2rem;text-transform:uppercase;letter-spacing:.05em}
+.risk-bars{display:flex;flex-direction:column;gap:.65rem}
+.rb{display:flex;align-items:center;gap:.75rem}
+.rb-lbl{font-size:.74rem;color:var(--muted);width:145px;flex-shrink:0}
+.rb-track{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.rb-fill{height:6px;border-radius:3px;transition:width .9s cubic-bezier(.4,0,.2,1)}
+.rb-tag{font-family:var(--mono);font-size:.65rem;width:52px;text-align:right;flex-shrink:0}
+.mini-table{width:100%;border-collapse:collapse;font-size:.78rem}
+.mini-table th{
+  color:var(--muted);text-align:left;padding:.4rem .6rem;
+  border-bottom:1px solid var(--border);font-weight:500;
+  font-family:var(--mono);font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;
+}
+.mini-table td{padding:.55rem .6rem;border-bottom:1px solid rgba(255,255,255,.04)}
+.mini-table tr:last-child td{border-bottom:none}
+.chip{font-size:.65rem;padding:2px 7px;border-radius:4px;font-family:var(--mono);display:inline-block}
+.chip-r{background:rgba(255,100,100,.15);color:#ff6b6b}
+.chip-y{background:rgba(255,180,0,.15);color:#ffb800}
+.chip-g{background:rgba(0,255,136,.12);color:var(--green)}
+.soa-row{
+  display:flex;align-items:center;gap:.75rem;
+  background:rgba(0,0,0,.2);border-radius:8px;padding:.55rem .8rem;margin-bottom:.45rem;
+}
+.soa-num{font-family:var(--mono);font-size:.7rem;color:var(--cyan);width:36px;flex-shrink:0}
+.soa-name{font-size:.78rem;flex:1}
+.soa-st{font-family:var(--mono);font-size:.65rem}
+
+/* ── PRECIOS ── */
+.pricing-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:1.5rem;margin-top:4rem;align-items:start;
+}
+.price-card{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:20px;padding:2.5rem;
+  position:relative;transition:transform .25s;
+}
+.price-card:hover{transform:translateY(-4px)}
+.price-card.featured{
+  border-color:var(--green);
+  background:linear-gradient(160deg,rgba(0,255,136,.05),var(--s1));
+  box-shadow:0 0 40px rgba(0,255,136,.12);
+}
+.price-popular{
+  position:absolute;top:-14px;left:50%;transform:translateX(-50%);
+  background:var(--green);color:#04090f;
+  font-family:var(--mono);font-size:.68rem;font-weight:700;
+  padding:.3rem 1rem;border-radius:100px;letter-spacing:.08em;white-space:nowrap;
+}
+.price-plan{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.75rem}
+.price-amount{font-family:var(--mono);font-size:3rem;font-weight:700;color:var(--text);line-height:1}
+.price-amount sup{font-size:1.2rem;vertical-align:super}
+.price-amount span{font-size:1rem;color:var(--muted);font-weight:400}
+.price-desc{font-size:.85rem;color:var(--muted);margin:.75rem 0 1.75rem;line-height:1.55}
+.price-feats{list-style:none;margin-bottom:2rem}
+.price-feats li{
+  font-size:.85rem;padding:.5rem 0;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:.6rem;
+}
+.price-feats li:last-child{border-bottom:none}
+.price-feats li::before{content:'✓';color:var(--green);font-family:var(--mono);font-weight:700;flex-shrink:0}
+.btn-price{
+  display:block;text-align:center;text-decoration:none;
+  padding:.85rem;border-radius:8px;font-weight:700;font-size:.9rem;
+  transition:all .2s;letter-spacing:.02em;
+}
+.btn-price-ol{border:1px solid var(--border);color:var(--text)}
+.btn-price-ol:hover{border-color:var(--green);color:var(--green)}
+.btn-price-solid{background:var(--green);color:#04090f;box-shadow:0 0 20px rgba(0,255,136,.3)}
+.btn-price-solid:hover{box-shadow:0 0 35px rgba(0,255,136,.5)}
+
+/* ── CTA ── */
+#cta{
+  text-align:center;
+  background:radial-gradient(ellipse 80% 60% at 50% 100%,rgba(0,255,136,.07),transparent);
+  border-top:1px solid var(--border);
+}
+#cta h2{font-size:clamp(2.2rem,5vw,4rem);font-weight:900;letter-spacing:-.04em;line-height:1.05;margin-bottom:1.25rem}
+#cta p{font-size:1.05rem;color:var(--muted);max-width:480px;margin:0 auto 3rem;line-height:1.7}
+.cta-sub{margin-top:1.75rem;font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+.cta-sub em{color:var(--green);font-style:normal}
+
+/* ── FOOTER ── */
+footer{
+  position:relative;z-index:1;
+  border-top:1px solid var(--border);padding:2rem 6%;
+  display:flex;justify-content:space-between;align-items:center;
+  flex-wrap:wrap;gap:1rem;background:var(--bg);
+}
+.f-logo{font-size:1rem;font-weight:800;color:var(--text)}
+.f-logo em{color:var(--green);font-style:normal}
+.f-copy{font-family:var(--mono);font-size:.7rem;color:var(--muted)}
+.f-tag{
+  font-family:var(--mono);font-size:.68rem;color:var(--green);
+  border:1px solid rgba(0,255,136,.2);background:rgba(0,255,136,.05);
+  padding:.25rem .7rem;border-radius:4px;
+}
+
+/* reveal */
+.rv{opacity:0;transform:translateY(28px);transition:opacity .65s ease,transform .65s ease}
+.rv.in{opacity:1;transform:none}
+
+@media(max-width:960px){
+  .feat-grid,.pricing-grid{grid-template-columns:1fr 1fr}
+  .problem-grid{grid-template-columns:1fr}
+  .steps{grid-template-columns:1fr 1fr;gap:2.5rem}
+  .steps::before{display:none}
+  .demo-wrap{grid-template-columns:1fr}
+  .hero-stats{gap:2rem}
+}
+@media(max-width:580px){
+  .feat-grid,.pricing-grid{grid-template-columns:1fr}
+  .nav-r .nav-link{display:none}
+}
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="logo">
+    <div class="logo-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2L4 6v6c0 5.5 3.5 10.7 8 12 4.5-1.3 8-6.5 8-12V6L12 2z" fill="#04090f"/>
+        <path d="M9 12l2 2 4-4" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <span class="logo-name">Compli<em>Sec</em></span>
+  </a>
+  <div class="nav-r">
+    <a href="#features"  class="nav-link">Características</a>
+    <a href="#como"      class="nav-link">Cómo funciona</a>
+    <a href="#demo"      class="nav-link">Demo</a>
+    <a href="#precios"   class="nav-link">Precios</a>
+    <a href="http://localhost:3000" class="nav-cta">Acceder →</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-pill"><span class="dot"></span>ISO/IEC 27001:2022 · Plataforma para Pymes</div>
+  <h1>Cumplimiento de seguridad<br/><span class="h1-grad">sin la complejidad</span></h1>
+  <p class="hero-p">CompliSec guía a tu empresa paso a paso hacia la certificación ISO 27001. Gestión de activos, evaluación de riesgos y evidencias de auditoría — todo en un solo lugar.</p>
+  <div class="hero-btns">
+    <a href="http://localhost:3000" class="btn-main">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      Comenzar gratis
+    </a>
+    <a href="#demo" class="btn-outline">Ver demo interactiva ↓</a>
+  </div>
+  <div class="hero-stats">
+    <div class="stat-item"><span class="stat-num">93</span><div class="stat-lbl">Controles ISO 27001</div></div>
+    <div class="stat-item"><span class="stat-num">100%</span><div class="stat-lbl">Trazabilidad de evidencias</div></div>
+    <div class="stat-item"><span class="stat-num">C·I·A</span><div class="stat-lbl">Valoración de activos</div></div>
+    <div class="stat-item"><span class="stat-num">&lt;1h</span><div class="stat-lbl">Para el primer diagnóstico</div></div>
+  </div>
+</section>
+
+<!-- PROBLEMA -->
+<section id="problema">
+  <span class="sec-label rv">// el problema</span>
+  <h2 class="sec-h rv">Las Pymes gestionan ISO 27001<br/>con hojas de cálculo</h2>
+  <p class="sec-p rv">Las soluciones existentes son costosas y complejas. Las alternativas son Excel y caos. Existe un camino mejor.</p>
+  <div class="problem-grid">
+    <div class="prob-card rv">
+      <span class="pico">📊</span>
+      <h3>Excel no es un SGSI</h3>
+      <p>Hojas de cálculo sin estructura, sin historial de cambios, sin control de acceso. Un auditor lo rechaza en el primer día.</p>
+    </div>
+    <div class="prob-card rv">
+      <span class="pico">💸</span>
+      <h3>Las soluciones enterprise son inaccesibles</h3>
+      <p>Plataformas como Vanta o ISMS.online cuestan miles de dólares al mes — diseñadas para grandes corporaciones, no para Pymes.</p>
+    </div>
+    <div class="prob-card rv">
+      <span class="pico">🔍</span>
+      <h3>Sin trazabilidad de evidencias</h3>
+      <p>Sin un sistema, los documentos están dispersos en correos y drives. En una auditoría, no puedes demostrar nada.</p>
+    </div>
+    <div class="prob-card rv">
+      <span class="pico">🧩</span>
+      <h3>La norma es compleja sin guía</h3>
+      <p>93 controles, cláusulas, declaraciones de aplicabilidad. Sin una herramienta que te guíe, la implementación puede tomar años.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CARACTERÍSTICAS -->
+<section id="features">
+  <span class="sec-label rv">// características</span>
+  <h2 class="sec-h rv">Todo lo que necesitas<br/>para implementar ISO 27001</h2>
+  <p class="sec-p rv">Cada módulo cubre una cláusula o dominio específico de la norma. Sin ambigüedades.</p>
+  <div class="feat-grid">
+    <div class="feat-card rv">
+      <div class="feat-ico">🗃️</div>
+      <h3>Inventario de Activos</h3>
+      <p>Registra y clasifica activos con valoración C-I-A. El sistema calcula la criticidad automáticamente.</p>
+      <span class="feat-tag">ISO A.8</span>
+    </div>
+    <div class="feat-card rv">
+      <div class="feat-ico">⚠️</div>
+      <h3>Evaluación de Riesgos</h3>
+      <p>Identifica amenazas y vulnerabilidades por activo. Nivel de riesgo calculado como P × I según ISO 27005.</p>
+      <span class="feat-tag">Cláusula 6.1.2</span>
+    </div>
+    <div class="feat-card rv">
+      <div class="feat-ico">📋</div>
+      <h3>Declaración de Aplicabilidad</h3>
+      <p>Gestiona los 93 controles del Anexo A con estado, justificación obligatoria y trazabilidad auditada.</p>
+      <span class="feat-tag">Cláusula 6.1.3</span>
+    </div>
+    <div class="feat-card rv">
+      <div class="feat-ico">📎</div>
+      <h3>Gestión de Evidencias</h3>
+      <p>Sube documentos vinculados a cada control. Trazabilidad completa para presentar en auditorías externas.</p>
+      <span class="feat-tag">Cláusula 7.5</span>
+    </div>
+    <div class="feat-card rv">
+      <div class="feat-ico">📊</div>
+      <h3>Dashboard de Cumplimiento</h3>
+      <p>Visualiza el porcentaje de implementación, riesgos críticos y estado de tus controles en tiempo real.</p>
+      <span class="feat-tag">Cláusula 9.1</span>
+    </div>
+    <div class="feat-card rv">
+      <div class="feat-ico">🔐</div>
+      <h3>Control de Acceso RBAC</h3>
+      <p>Roles ADMIN, CISO y AUDITOR. Cada persona ve solo lo que necesita. Multi-tenant desde el día uno.</p>
+      <span class="feat-tag">ISO A.9</span>
+    </div>
+  </div>
+</section>
+
+<!-- CÓMO FUNCIONA -->
+<section id="como">
+  <span class="sec-label rv">// cómo funciona</span>
+  <h2 class="sec-h rv">De cero a auditable<br/>en 4 pasos</h2>
+  <p class="sec-p rv">El proceso está diseñado para que cualquier persona, sin conocimientos avanzados, pueda implementarlo.</p>
+  <div class="steps">
+    <div class="step rv">
+      <div class="step-num">01</div>
+      <h3>Onboarding</h3>
+      <p>Registra tu organización y completa el diagnóstico inicial. El sistema calcula tu perfil de riesgo base.</p>
+    </div>
+    <div class="step rv">
+      <div class="step-num">02</div>
+      <h3>Inventario y Riesgos</h3>
+      <p>Carga tus activos críticos y evalúa las amenazas sobre cada uno. La matriz de riesgo se genera sola.</p>
+    </div>
+    <div class="step rv">
+      <div class="step-num">03</div>
+      <h3>Controles y SoA</h3>
+      <p>Revisa los 93 controles del Anexo A, indica cuáles aplican y documenta su estado de implementación.</p>
+    </div>
+    <div class="step rv">
+      <div class="step-num">04</div>
+      <h3>Evidencias y Auditoría</h3>
+      <p>Sube los documentos que respaldan cada control. Cuando llegue el auditor, todo está organizado y trazado.</p>
+    </div>
+  </div>
+</section>
+
+<!-- DEMO INTERACTIVA -->
+<section id="demo" style="background:linear-gradient(180deg,var(--bg) 0%,var(--s1) 50%,var(--bg) 100%)">
+  <span class="sec-label rv">// demo interactiva</span>
+  <h2 class="sec-h rv">Explora la plataforma<br/>sin registrarte</h2>
+  <p class="sec-p rv">Navega entre los módulos y ve exactamente cómo funciona CompliSec.</p>
+  <div class="demo-wrap">
+    <div class="demo-tabs">
+      <button class="dtab active rv" onclick="showDemo(0,this)">
+        <div class="dtab-num">01 — DASHBOARD</div>
+        <h3>Panel de control</h3>
+        <p>KPIs de cumplimiento, riesgos críticos y progreso general de tu SGSI.</p>
+      </button>
+      <button class="dtab rv" onclick="showDemo(1,this)">
+        <div class="dtab-num">02 — ACTIVOS</div>
+        <h3>Inventario C·I·A</h3>
+        <p>Tabla de activos con valoración de criticidad calculada automáticamente.</p>
+      </button>
+      <button class="dtab rv" onclick="showDemo(2,this)">
+        <div class="dtab-num">03 — RIESGOS</div>
+        <h3>Matriz de riesgos</h3>
+        <p>Perfil de riesgo por dominio ISO 27001 con niveles crítico / alto / bajo.</p>
+      </button>
+      <button class="dtab rv" onclick="showDemo(3,this)">
+        <div class="dtab-num">04 — SoA</div>
+        <h3>Controles Anexo A</h3>
+        <p>Estado de implementación de los 93 controles de la norma.</p>
+      </button>
+    </div>
+    <div class="demo-screen rv">
+      <div class="demo-titlebar">
+        <div class="dtb-dot" style="background:#ff5f57"></div>
+        <div class="dtb-dot" style="background:#ffbd2e"></div>
+        <div class="dtb-dot" style="background:#28ca41"></div>
+        <div class="dtb-url">localhost:3000 — CompliSec</div>
+      </div>
+      <div class="demo-body" id="demo-body"></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRECIOS -->
+<section id="precios">
+  <span class="sec-label rv">// precios</span>
+  <h2 class="sec-h rv">Simple. Transparente.<br/>Accesible para Pymes.</h2>
+  <p class="sec-p rv">Sin contratos anuales forzados. Sin costos ocultos. Cancela cuando quieras.</p>
+  <div class="pricing-grid">
+    <div class="price-card rv">
+      <div class="price-plan">Starter</div>
+      <div class="price-amount"><sup>$</sup>0<span>/mes</span></div>
+      <p class="price-desc">Para comenzar tu diagnóstico y explorar la plataforma sin compromiso.</p>
+      <ul class="price-feats">
+        <li>1 organización</li>
+        <li>Hasta 10 activos</li>
+        <li>Evaluación de riesgos básica</li>
+        <li>Dashboard de cumplimiento</li>
+        <li>Soporte por email</li>
+      </ul>
+      <a href="http://localhost:3000" class="btn-price btn-price-ol">Comenzar gratis</a>
+    </div>
+    <div class="price-card featured rv">
+      <div class="price-popular">MÁS POPULAR</div>
+      <div class="price-plan">Pro</div>
+      <div class="price-amount"><sup>$</sup>49<span>/mes</span></div>
+      <p class="price-desc">Para Pymes que necesitan cumplimiento real y prepararse para auditorías.</p>
+      <ul class="price-feats">
+        <li>1 organización</li>
+        <li>Activos ilimitados</li>
+        <li>Los 93 controles ISO 27001</li>
+        <li>Gestión de evidencias completa</li>
+        <li>Declaración de Aplicabilidad (SoA)</li>
+        <li>Exportación de reportes PDF</li>
+        <li>Soporte prioritario</li>
+      </ul>
+      <a href="http://localhost:3000" class="btn-price btn-price-solid">Empezar ahora →</a>
+    </div>
+    <div class="price-card rv">
+      <div class="price-plan">Enterprise</div>
+      <div class="price-amount"><sup>$</sup>149<span>/mes</span></div>
+      <p class="price-desc">Para empresas con múltiples unidades o que proveen servicios a otras.</p>
+      <ul class="price-feats">
+        <li>Organizaciones ilimitadas</li>
+        <li>Multi-tenant completo</li>
+        <li>Roles personalizados (RBAC)</li>
+        <li>API de integración</li>
+        <li>Onboarding dedicado</li>
+        <li>SLA garantizado</li>
+      </ul>
+      <a href="http://localhost:3000" class="btn-price btn-price-ol">Contactar ventas</a>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section id="cta">
+  <span class="sec-label rv">// empieza hoy</span>
+  <h2 class="rv">Tu primera auditoría<br/><span style="background:linear-gradient(90deg,var(--green),var(--cyan));-webkit-background-clip:text;color:transparent">está más cerca de lo que crees</span></h2>
+  <p class="rv">Regístrate en menos de 2 minutos. Sin tarjeta de crédito. Sin compromisos.</p>
+  <a href="http://localhost:3000" class="btn-main rv" style="display:inline-flex;font-size:1.05rem;padding:1.1rem 3rem">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    Abrir CompliSec
+  </a>
+  <p class="cta-sub rv">// <em>ISO/IEC 27001:2022</em> · Arquitectura microservicios · Desarrollado en Chile</p>
+</section>
+
+<footer>
+  <div class="f-logo">Compli<em>Sec</em></div>
+  <div class="f-copy">© 2026 CompliSec SaaS — Cumplimiento Simplificado para Pymes</div>
+  <div class="f-tag">ISO/IEC 27001:2022</div>
+</footer>
+
+<script>
+/* ── Canvas partículas ── */
+const canvas=document.getElementById('canvas');
+const ctx=canvas.getContext('2d');
+let W,H,pts=[];
+function resize(){W=canvas.width=innerWidth;H=canvas.height=innerHeight}
+resize();addEventListener('resize',resize);
+function rp(){return{x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,r:Math.random()*1.5+.5}}
+for(let i=0;i<80;i++)pts.push(rp());
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  pts.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;
+    if(p.x<0||p.x>W)p.vx*=-1;
+    if(p.y<0||p.y>H)p.vy*=-1;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,255,136,.5)';ctx.fill();
+  });
+  for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+    const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.sqrt(dx*dx+dy*dy);
+    if(d<130){ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);
+      ctx.strokeStyle=`rgba(0,255,136,${.13*(1-d/130)})`;ctx.lineWidth=.6;ctx.stroke();}
+  }
+  requestAnimationFrame(draw);
+}
+draw();
+
+/* ── Demo panels ── */
+const panels=[
+  `<div class="kpi-row">
+    <div class="kpi"><span class="kpi-n" style="color:var(--green)">68%</span><div class="kpi-l">Cumplimiento</div></div>
+    <div class="kpi"><span class="kpi-n" style="color:#ff6b6b">3</span><div class="kpi-l">Riesgos críticos</div></div>
+    <div class="kpi"><span class="kpi-n" style="color:var(--cyan)">41</span><div class="kpi-l">Controles OK</div></div>
+  </div>
+  <div class="dpanel-title">Progreso global · 41 / 93 controles</div>
+  <div style="background:rgba(0,0,0,.3);border-radius:100px;height:8px;margin-bottom:1.5rem;overflow:hidden">
+    <div style="width:68%;height:8px;background:linear-gradient(90deg,var(--green),var(--cyan));border-radius:100px"></div>
+  </div>
+  <div class="dpanel-title">Riesgos más críticos</div>
+  ${[['Base de datos clientes','Ransomware',20,'#ff6b6b'],['Servidor web','Acceso no autorizado',16,'#ff6b6b'],['Correos corp.','Phishing',12,'#ffb800'],['Laptops','Robo físico',6,'var(--green)']].map(([a,t,s,c])=>`
+  <div style="display:flex;align-items:center;gap:.75rem;background:rgba(0,0,0,.2);border-radius:8px;padding:.5rem .75rem;margin-bottom:.4rem">
+    <div style="flex:1;font-size:.78rem"><strong>${a}</strong><div style="font-size:.7rem;color:var(--muted)">${t}</div></div>
+    <span style="font-family:var(--mono);font-size:.75rem;background:${c}22;color:${c};padding:2px 8px;border-radius:4px">${s}</span>
+  </div>`).join('')}`,
+
+  `<div class="dpanel-title">Inventario de activos — valoración C·I·A</div>
+  <table class="mini-table"><thead><tr><th>Activo</th><th>C·I·A</th><th>Criticidad</th></tr></thead><tbody>
+  ${[['Base de datos clientes','5·5·4','<span class="chip chip-r">ALTA (14)</span>'],['Servidor web principal','4·5·5','<span class="chip chip-r">ALTA (14)</span>'],['Repositorio de código','3·5·3','<span class="chip chip-y">MEDIA (11)</span>'],['Correos corporativos','5·3·4','<span class="chip chip-y">MEDIA (12)</span>'],['Laptops empleados','3·3·3','<span class="chip chip-g">BAJA (9)</span>']].map(([n,c,cr])=>`<tr><td>${n}</td><td style="font-family:var(--mono);font-size:.7rem;color:var(--cyan)">${c}</td><td>${cr}</td></tr>`).join('')}
+  </tbody></table>`,
+
+  `<div class="dpanel-title">Perfil de riesgo por dominio ISO 27001</div>
+  <div class="risk-bars">
+  ${[['A.9 Control de acceso',80,'#ff6b6b','Crítico'],['A.16 Incidentes',72,'#ff6b6b','Crítico'],['A.10 Criptografía',60,'#ffb800','Alto'],['A.12 Operaciones',55,'#ffb800','Alto'],['A.17 Continuidad',35,'#4fc3f7','Medio'],['A.15 Proveedores',18,'var(--green)','Bajo']].map(([l,w,c,t])=>`
+  <div class="rb"><span class="rb-lbl">${l}</span><div class="rb-track"><div class="rb-fill" style="width:${w}%;background:${c}"></div></div><span class="rb-tag" style="color:${c}">${t}</span></div>`).join('')}
+  </div>
+  <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+  ${[['Críticos','2','#ff6b6b'],['Altos','2','#ffb800'],['Controlados','2','var(--green)']].map(([l,n,c])=>`
+  <div style="flex:1;background:rgba(0,0,0,.25);border-radius:8px;padding:.65rem;text-align:center">
+    <div style="font-family:var(--mono);font-size:1.4rem;font-weight:700;color:${c}">${n}</div>
+    <div style="font-size:.65rem;color:var(--muted);margin-top:.2rem">${l}</div>
+  </div>`).join('')}
+  </div>`,
+
+  `<div class="dpanel-title">Declaración de Aplicabilidad · Anexo A</div>
+  ${[['5.1','Políticas de seguridad','IMPLEMENTADO','var(--green)'],['6.1','Investigación de antecedentes','PARCIAL','#ffb800'],['8.1','Dispositivos de usuario','IMPLEMENTADO','var(--green)'],['8.12','Prevención fuga de datos','NO EVALUADO','var(--muted)'],['8.15','Logging y monitoreo','PARCIAL','#ffb800'],['8.24','Uso de criptografía','IMPLEMENTADO','var(--green)']].map(([n,name,st,c])=>`
+  <div class="soa-row"><span class="soa-num">${n}</span><span class="soa-name">${name}</span><span class="soa-st" style="color:${c}">${st}</span></div>`).join('')}
+  <div style="margin-top:1rem;font-family:var(--mono);font-size:.68rem;color:var(--muted);text-align:center">93 controles · 41 implementados · 29 parciales · 23 pendientes</div>`
+];
+
+function showDemo(idx,btn){
+  document.querySelectorAll('.dtab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  const b=document.getElementById('demo-body');
+  b.style.animation='none';b.offsetHeight;b.style.animation='fadeIn .35s ease';
+  b.innerHTML=panels[idx];
+  if(idx===2){
+    setTimeout(()=>{
+      document.querySelectorAll('.rb-fill').forEach(f=>{const w=f.style.width;f.style.width='0';setTimeout(()=>f.style.width=w,50)});
+    },50);
+  }
+}
+document.getElementById('demo-body').innerHTML=panels[0];
+
+/* ── Scroll reveal ── */
+const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in')})},{threshold:.1});
+document.querySelectorAll('.rv').forEach((el,i)=>{el.style.transitionDelay=`${Math.floor(i%4)*.09}s`;obs.observe(el)});
+</script>
+</body>
+</html>
