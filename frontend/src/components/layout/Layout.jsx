@@ -13,8 +13,15 @@ const Layout = ({ children, user, onLogout }) => {
     <div className="app-layout">
       <header className="app-header">
         <div className="logo-container">
+          <img
+            src="/logo.png"
+            alt="CompliSec"
+            width={36}
+            height={36}
+            style={{ borderRadius: 8, objectFit: 'contain' }}
+            onError={e => { e.target.style.display = 'none'; }}
+          />
           <h1>CompliSec</h1>
-          <span className="badge">ISO/IEC 27001</span>
         </div>
 
         <nav className="header-nav" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>

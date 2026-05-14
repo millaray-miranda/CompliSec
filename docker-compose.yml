@@ -35,6 +35,8 @@ services:
       - database
     volumes:
       - ./bff/src:/app/src
+      # Volumen persistente para evidencias — los archivos sobreviven reinicios
+      - uploads_data:/app/uploads
     networks:
       - complisec_network
 
@@ -61,4 +63,5 @@ networks:
     driver: bridge
 
 volumes:
-  pgdata:
+  pgdata:          # Datos de PostgreSQL
+  uploads_data:    # Archivos de evidencias subidos

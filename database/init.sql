@@ -80,3 +80,18 @@ CREATE TABLE evidences (
     uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     review_status VARCHAR(50) DEFAULT 'PENDING' -- PENDING, APPROVED, REJECTED
 );
+
+
+CREATE TABLE IF NOT EXISTS diagnostic_risks (
+    id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    organization_id  UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    domain_key       VARCHAR(20)  NOT NULL,   -- acceso, cripto, ops, inc, cont
+    domain_label     VARCHAR(100) NOT NULL,   -- Control de acceso (A.9), etc.
+    probability      INT          NOT NULL DEFAULT 0,  -- 0-100
+    impact_value     INT          NOT NULL DEFAULT 0,  -- 0-100
+    risk_score       INT          NOT NULL DEFAULT 0,  -- prob * impact / 100
+    risk_level_label VARCHAR(20)  NOT NULL DEFAULT 'Bajo', -- Crítico, Alto, Medio, Bajo
+    created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (organization_id, domain_key)
+);
