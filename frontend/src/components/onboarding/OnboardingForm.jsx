@@ -1,447 +1,605 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from '../../utils/axiosSetup';
 
-const OnboardingForm = ({ onComplete }) => {
-  const [formData, setFormData] = useState({
-    organization: { name: '', industry: '', size: 'MICRO' },
-    admin: { name: '', email: '', password: '', confirmPassword: '' }
+const STORAGE_KEY = 'compliSec_diagnostic_progress';
+
+const calcScore = (prob, impact) => Math.round((prob / 100) * (impact / 100) * 100);
+
+const riskMeta = (score) => {
+  if (score >= 70) return { color: 'var(--danger)',  label: 'Crítico' };
+  if (score >= 45) return { color: 'var(--warning)', label: 'Alto'    };
+  if (score >= 20) return { color: 'var(--accent)',  label: 'Medio'   };
+  return               { color: 'var(--success)', label: 'Bajo'    };
+};
+
+const STEPS = ['Empresa','Infraestructura','Acceso A.9','Operaciones A.12','Incidentes A.16','Perfil de riesgo','Activos','Revisión'];
+const TRI_MAP = { no: 88, sin: 52, ok: 14 };
+
+// ─── Plantillas de activos por tipo ──────────────────────────────────────────
+const ASSET_TEMPLATES = [
+  { type:'server',    icon:'🖥️',  label:'Servidor',          desc:'Servidor físico o virtual',             c:3, i:4, a:5, nameSug:'Servidor principal' },
+  { type:'database',  icon:'🗄️',  label:'Base de datos',     desc:'BD de clientes, operaciones o usuarios', c:5, i:4, a:4, nameSug:'Base de datos de clientes' },
+  { type:'webapp',    icon:'🌐',  label:'Aplicación web',    desc:'Sistema o plataforma accesible en línea', c:3, i:3, a:4, nameSug:'Aplicación web corporativa' },
+  { type:'device',    icon:'💻',  label:'Dispositivo físico', desc:'Laptop, PC, tablet o teléfono',           c:2, i:3, a:3, nameSug:'Laptop corporativa' },
+  { type:'document',  icon:'📄',  label:'Documento',         desc:'Política, contrato o archivo crítico',   c:4, i:4, a:2, nameSug:'Política de seguridad' },
+  { type:'person',    icon:'👤',  label:'Persona / Usuario', desc:'Cuenta con acceso privilegiado',          c:5, i:3, a:2, nameSug:'Administrador del sistema' },
+  { type:'network',   icon:'🔌',  label:'Red / Firewall',    desc:'Infraestructura de red o perímetro',      c:3, i:4, a:5, nameSug:'Firewall corporativo' },
+  { type:'cloud',     icon:'☁️',  label:'Servicio en nube',  desc:'AWS, Azure, GCP u otro SaaS crítico',    c:4, i:3, a:4, nameSug:'Almacenamiento en nube' },
+];
+
+// ─── TriGroup ────────────────────────────────────────────────────────────────
+function TriGroup({ groupKey, state, onSelect, options }) {
+  const vs = {
+    no:  { border:'var(--danger)',  bg:'rgba(239,68,68,.08)',  text:'var(--danger)'  },
+    sin: { border:'var(--warning)', bg:'rgba(245,158,11,.08)', text:'var(--warning)' },
+    ok:  { border:'var(--success)', bg:'rgba(16,185,129,.08)', text:'var(--success)' },
+  };
+  return (
+    <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'0.6rem' }}>
+      {options.map(([v, title, desc]) => {
+        const active = state[groupKey] === v;
+        return (
+          <div key={v} onClick={() => onSelect(groupKey, v)} style={{
+            border: `1.5px solid ${active ? vs[v].border : 'var(--border)'}`,
+            borderRadius:10, padding:'0.75rem', cursor:'pointer', textAlign:'center',
+            background: active ? vs[v].bg : 'rgba(255,255,255,.03)', transition:'all .15s',
+          }}>
+            <div style={{ fontSize:'0.85rem', fontWeight:600, marginBottom:3, color: active ? vs[v].text : 'var(--text-primary)' }}>{title}</div>
+            <div style={{ fontSize:'0.75rem', color:'var(--text-secondary)' }}>{desc}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const DEFAULT_TRI = [['no','No existe','Sin registro'],['sin','Existe','Sin documentar'],['ok','Documentado','Con evidencia']];
+
+// ─── UI helpers ──────────────────────────────────────────────────────────────
+const FG = ({ label, iso, children }) => (
+  <div style={{ display:'flex', flexDirection:'column', gap:'0.5rem' }}>
+    <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', flexWrap:'wrap' }}>
+      <span style={{ fontSize:'0.88rem', color:'var(--text-secondary)', fontWeight:500 }}>{label}</span>
+      {iso && <span style={{ fontSize:'0.7rem', fontWeight:600, color:'var(--success)', background:'rgba(16,185,129,.1)', border:'1px solid rgba(16,185,129,.2)', borderRadius:20, padding:'1px 8px' }}>{iso}</span>}
+    </div>
+    {children}
+  </div>
+);
+
+const Sel = ({ value, onChange, options, placeholder }) => (
+  <select value={value} onChange={onChange} style={{ background:'rgba(0,0,0,.25)', border:'1px solid var(--border)', borderRadius:8, padding:'0.7rem 1rem', color:'var(--text-primary)', fontSize:'0.9rem', outline:'none', width:'100%', cursor:'pointer' }}>
+    {placeholder && <option value="">{placeholder}</option>}
+    {options.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+  </select>
+);
+
+const Badge = ({ children }) => (
+  <span style={{ display:'inline-flex', alignItems:'center', background:'rgba(16,185,129,.08)', border:'1px solid rgba(16,185,129,.2)', borderRadius:20, padding:'3px 10px', fontSize:'0.75rem', color:'var(--success)', fontWeight:600 }}>{children}</span>
+);
+
+// ─── COMPONENTE PRINCIPAL ────────────────────────────────────────────────────
+const DiagnosticWizard = ({ organizationId, userName, onComplete }) => {
+  // Carga estado guardado si existe
+  const loadSaved = () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  };
+  const saved = loadSaved();
+
+  const [step, setStep]     = useState(saved?.step     ?? 0);
+  const [tri, setTri]       = useState(saved?.tri      ?? {});
+  const [checks, setChecks] = useState(saved?.checks   ?? {});
+  const [evSel, setEvSel]   = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState('');
+  const [showResume, setShowResume] = useState(!!saved && saved.step > 0);
+
+  // Estado de activos del onboarding
+  const [onboardingAssets, setOnboardingAssets] = useState(saved?.onboardingAssets ?? []);
+  const [activeTemplate, setActiveTemplate]     = useState(null);
+  const [assetDraft, setAssetDraft]             = useState(null);
+  const [assetError, setAssetError]             = useState('');
+
+  const [sel, setSels] = useState(saved?.sel ?? { dataSensitivity:'', regulation:'No aplica', providers:'', systems:'', patches:'', rto:'', training:'', providerClauses:'', reviewFrequency:'12m' });
+  const s = (k,v) => setSels(p => ({...p, [k]:v}));
+
+  const [riskData, setRiskData] = useState(saved?.riskData ?? {
+    acceso: { label:'Control de acceso (A.9)', prob:0, impact:0 },
+    cripto: { label:'Criptografía (A.10)',      prob:0, impact:0 },
+    ops:    { label:'Operaciones (A.12)',        prob:0, impact:0 },
+    inc:    { label:'Incidentes (A.16)',         prob:0, impact:0 },
+    cont:   { label:'Continuidad (A.17)',        prob:0, impact:0 },
   });
 
-  const [formErrors, setFormErrors]     = useState({});
-  const [serverError, setServerError]   = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const handleOrgChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, organization: { ...prev.organization, [name]: value } }));
-    if (formErrors[`organization.${name}`]) setFormErrors(prev => ({ ...prev, [`organization.${name}`]: null }));
-  };
-
-  const handleAdminChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, admin: { ...prev.admin, [name]: value } }));
-    if (formErrors[`admin.${name}`]) setFormErrors(prev => ({ ...prev, [`admin.${name}`]: null }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setFormErrors({});
-    setServerError('');
-
-    const errorsMap = {};
-
-    // Campos obligatorios
-    if (!formData.admin.name.trim())                  errorsMap['admin.name']              = 'El nombre es obligatorio.';
-    if (!formData.admin.email.trim())                 errorsMap['admin.email']             = 'El correo es obligatorio.';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.admin.email)) errorsMap['admin.email'] = 'Ingresa un correo válido.';
-    if (!formData.organization.name.trim())           errorsMap['organization.name']       = 'El nombre de la empresa es obligatorio.';
-    if (!formData.organization.industry.trim())       errorsMap['organization.industry']   = 'La industria es obligatoria.';
-
-    const pwd = formData.admin.password;
-    const pwdErrors = [];
-    if (!pwd) {
-      errorsMap['admin.password'] = 'La contraseña es obligatoria.';
-    } else {
-      if (pwd.length < 8)                                               pwdErrors.push('8 caracteres');
-      if (!/[A-Z]/.test(pwd))                                           pwdErrors.push('1 mayúscula');
-      if (!/[a-z]/.test(pwd))                                           pwdErrors.push('1 minúscula');
-      if (!/[0-9]/.test(pwd))                                           pwdErrors.push('1 número');
-      if (!/[!@#$%^&*(),.?":{}|<>_+\-=\[\]\\]/.test(pwd))             pwdErrors.push('1 carácter especial');
-      if (pwdErrors.length > 0) errorsMap['admin.password'] = 'Debe incluir: ' + pwdErrors.join(', ');
-    }
-    if (!formData.admin.confirmPassword)              errorsMap['admin.confirmPassword']   = 'Debes confirmar la contraseña.';
-    else if (pwd !== formData.admin.confirmPassword)  errorsMap['admin.confirmPassword']   = 'Las contraseñas no coinciden.';
-
-    if (Object.keys(errorsMap).length > 0) { setFormErrors(errorsMap); setIsSubmitting(false); return; }
-
+  // Auto-guardar en localStorage cuando cambia el estado
+  useEffect(() => {
     try {
-      const response = await axios.post('/api/onboarding', {
-        organization: formData.organization,
-        admin: { name: formData.admin.name, email: formData.admin.email, password: formData.admin.password }
-      });
-      if (response.status === 201) onComplete(response.data.data);
-    } catch (error) {
-      if (error.response?.status === 400 && error.response.data.details) {
-        const map = {};
-        error.response.data.details.forEach(err => { map[err.path] = err.message; });
-        setFormErrors(map);
-      } else if (error.response?.data?.message) {
-        setServerError(error.response.data.message);
-      } else {
-        setServerError('Ocurrió un error inesperado. Por favor, inténtelo de nuevo.');
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ step, tri, checks, sel, riskData, onboardingAssets }));
+    } catch { /* quota exceeded, ignore */ }
+  }, [step, tri, checks, sel, riskData]);
+
+  // Limpiar al finalizar
+  const clearSaved = () => { try { localStorage.removeItem(STORAGE_KEY); } catch {} };
+
+  const handleTri = (group, v) => {
+    setTri(prev => ({...prev, [group]:v}));
+    const p = TRI_MAP[v] ?? 0;
+    setRiskData(prev => {
+      const n = {...prev};
+      if (group==='mfa')     n.acceso = {...n.acceso, prob:p, impact:80};
+      if (group==='cripto')  n.cripto = {...n.cripto, prob:p, impact:85};
+      if (group==='logs')    n.ops    = {...n.ops,    prob:p, impact:75};
+      if (group==='backup')  n.cont   = {...n.cont,   prob:p, impact:78};
+      if (group==='inc')     n.inc    = {...n.inc,    prob:p, impact:70};
+      if (group==='accesos') n.acceso = {...n.acceso, prob:p, impact:80};
+      return n;
+    });
+  };
+
+  const handleFinish = async () => {
+    setSaving(true); setError('');
+    const risks = Object.entries(riskData).map(([key,r]) => {
+      const score = calcScore(r.prob, r.impact);
+      const { label } = riskMeta(score);
+      return { domain_key:key, domain_label:r.label, probability:r.prob, impact_value:r.impact, risk_score:score, risk_level_label:label };
+    });
+    try {
+      await axios.post('/api/diagnostic', { organization_id:organizationId, risks });
+      // Guardar activos del onboarding
+      if (onboardingAssets.length > 0) {
+        await Promise.all(onboardingAssets.map(a =>
+          axios.post('/api/assets', {
+            organization_id:    organizationId,
+            name:               a.name,
+            description:        a.description,
+            confidentiality_req: a.c,
+            integrity_req:       a.i,
+            availability_req:    a.a,
+          })
+        ));
       }
-    } finally {
-      setIsSubmitting(false);
+      clearSaved();
+      onComplete(risks);
+    } catch {
+      setError('No se pudo guardar el diagnóstico. Puedes intentarlo más tarde desde el dashboard.');
+      setSaving(false);
     }
   };
 
-  const pwd = formData.admin.password;
-  const hasMinLength = pwd.length >= 8;
-  const hasUppercase = /[A-Z]/.test(pwd);
-  const hasLowercase = /[a-z]/.test(pwd);
-  const hasNumber    = /[0-9]/.test(pwd);
-  const hasSymbol    = /[!@#$%^&*(),.?":{}|<>_+\-=\[\]\\]/.test(pwd);
-  const criteriaCount = [hasMinLength, hasUppercase, hasLowercase, hasNumber, hasSymbol].filter(Boolean).length;
-  const strengthPct   = (criteriaCount / 5) * 100;
-  const strengthColor = criteriaCount <= 1 ? 'var(--danger)' : criteriaCount <= 3 ? 'var(--warning)' : 'var(--success)';
-  const strengthLabel = criteriaCount === 0 ? '' : criteriaCount <= 1 ? 'Débil' : criteriaCount <= 3 ? 'Regular' : criteriaCount === 4 ? 'Buena' : 'Fuerte';
-
-  const EyeIcon = ({ show }) => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      {show ? (
-        <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></>
-      ) : (
-        <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>
-      )}
-    </svg>
-  );
-
-  const Field = ({ id, label, error, children }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1.1rem' }}>
-      <label htmlFor={id} style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-        {label}<span style={{ color: 'var(--danger)', marginLeft: '0.2rem' }}>*</span>
-      </label>
-      {children}
-      {error && <span style={{ fontSize: '0.75rem', color: 'var(--danger)', fontWeight: 500 }}>{error}</span>}
+  // Sidebar vertical de pasos
+  const Stepbar = () => (
+    <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+      {STEPS.map((label, i) => {
+        const done = i < step, active = i === step;
+        return (
+          <div key={i}
+            onClick={() => done && setStep(i)}
+            style={{
+              display:'flex', alignItems:'center', gap:'0.75rem',
+              padding:'0.55rem 0.75rem', borderRadius:8,
+              cursor: done ? 'pointer' : 'default',
+              background: active ? 'rgba(59,130,246,.12)' : 'transparent',
+              border: active ? '1px solid rgba(59,130,246,.25)' : '1px solid transparent',
+              transition:'all .2s',
+            }}
+          >
+            <div style={{
+              width:28, height:28, borderRadius:'50%', flexShrink:0,
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize:'0.75rem', fontWeight:700,
+              border:`2px solid ${done ? 'var(--success)' : active ? 'var(--accent)' : 'var(--border)'}`,
+              color: done ? 'var(--success)' : active ? '#fff' : 'var(--text-secondary)',
+              background: active ? 'var(--accent)' : done ? 'rgba(16,185,129,.1)' : 'transparent',
+              transition:'all .2s',
+            }}>
+              {done ? '✓' : i+1}
+            </div>
+            <span style={{
+              fontSize:'0.82rem', fontWeight:600,
+              color: active ? 'var(--text-primary)' : done ? 'var(--success)' : 'var(--text-secondary)',
+            }}>{label}</span>
+          </div>
+        );
+      })}
     </div>
   );
 
-  const inputStyle = (hasError) => ({
-    background: 'rgba(0,0,0,0.25)',
-    border: `1px solid ${hasError ? 'rgba(239,68,68,0.6)' : 'rgba(255,255,255,0.12)'}`,
-    borderRadius: '0.6rem',
-    color: 'var(--text-primary)',
-    padding: '0.7rem 0.9rem',
-    fontSize: '0.95rem',
-    outline: 'none',
-    width: '100%',
-    boxSizing: 'border-box',
-    fontFamily: 'inherit',
-    transition: 'border-color 0.2s, box-shadow 0.2s',
-    boxShadow: hasError ? '0 0 0 2px rgba(239,68,68,0.15)' : 'none',
-  });
+  // ── Pasos ────────────────────────────────────────────────────────────────
+  const steps = [
 
-  return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '2rem 1rem',
-    }}>
-      <div style={{ width: '100%', maxWidth: '860px' }}>
-
-        {/* ── Header ─────────────────────────────────────────────── */}
-        <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
-            <span style={{
-              background: 'rgba(59,130,246,0.15)',
-              border: '1px solid rgba(59,130,246,0.3)',
-              color: '#60a5fa',
-              fontSize: '0.72rem', fontWeight: 700,
-              padding: '0.25rem 0.75rem', borderRadius: 9999,
-              letterSpacing: '0.08em', textTransform: 'uppercase',
-            }}>ISO/IEC 27001:2022</span>
-          </div>
-          <h1 style={{
-            margin: '0 0 0.5rem',
-            fontSize: '2rem', fontWeight: 800,
-            background: 'linear-gradient(to right, #60a5fa, #34d399)',
-            WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
-          }}>
-            Configura tu organización
-          </h1>
-          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-            Cláusula 4 · Contexto de la organización y usuario administrador
-          </p>
-        </div>
-
-        {/* ── Steps indicator ────────────────────────────────────── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0', marginBottom: '2.5rem' }}>
-          {[
-            { n: 1, label: 'Organización' },
-            { n: 2, label: 'Administrador' },
-            { n: 3, label: 'Listo' },
-          ].map((step, i, arr) => (
-            <React.Fragment key={step.n}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 700, fontSize: '0.85rem',
-                  background: step.n <= 2 ? 'linear-gradient(135deg,#3b82f6,#10b981)' : 'rgba(255,255,255,0.06)',
-                  border: step.n <= 2 ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                  color: step.n <= 2 ? 'white' : 'var(--text-secondary)',
-                  boxShadow: step.n <= 2 ? '0 0 12px rgba(59,130,246,0.3)' : 'none',
-                }}>{step.n}</div>
-                <span style={{ fontSize: '0.7rem', color: step.n <= 2 ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: 500 }}>
-                  {step.label}
-                </span>
-              </div>
-              {i < arr.length - 1 && (
-                <div style={{ width: 60, height: 1, background: 'rgba(255,255,255,0.1)', margin: '0 0.5rem', marginBottom: '1.4rem' }} />
-              )}
-            </React.Fragment>
+    // 0 — Empresa
+    <div key={0} style={{ display:'flex', flexDirection:'column', gap:'1.25rem' }}>
+      <div><h2 style={{ fontSize:'1.5rem', fontWeight:700, margin:'0 0 .4rem', letterSpacing:'-.02em' }}>Contexto de tu organización</h2>
+      <p style={{ color:'var(--text-secondary)', margin:0, fontSize:'0.9rem' }}>Este diagnóstico calcula tu perfil de riesgo ISO 27001 basado en el estado actual de tu seguridad.</p></div>
+      <FG label="¿Qué tipo de datos manejan?" iso="define impacto base">
+        <Sel value={sel.dataSensitivity} onChange={e=>s('dataSensitivity',e.target.value)} placeholder="Seleccionar..." options={[['pub','Datos públicos'],['int','Datos internos'],['conf','Datos confidenciales de clientes'],['crit','Datos críticos (salud, financiero, legal)']]} />
+      </FG>
+      <FG label="¿Tienen requisitos regulatorios externos?" iso="A.18">
+        <Sel value={sel.regulation} onChange={e=>s('regulation',e.target.value)} options={[['No aplica','No aplica'],['RGPD / Ley 19.628','RGPD / Ley 19.628'],['PCI-DSS','PCI-DSS (pagos)'],['HIPAA','HIPAA (salud)'],['SOC 2','SOC 2'],['Otro','Otro']]} />
+      </FG>
+      <FG label="Tipo de infraestructura principal">
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.75rem' }}>
+          {[['cloud','☁️ Nube pública','AWS, Azure, GCP'],['hybrid','🔀 Nube híbrida','On-premise + nube'],['own','🖥️ Servidores propios','Data center local'],['saas','📦 Solo SaaS','Apps de terceros']].map(([k,t,d]) => (
+            <div key={k} onClick={()=>setTri(p=>({...p,infra:k}))} style={{ border:`1.5px solid ${tri.infra===k?'var(--accent)':'var(--border)'}`, borderRadius:10, padding:'0.85rem 1rem', cursor:'pointer', background: tri.infra===k?'rgba(59,130,246,.08)':'rgba(255,255,255,.03)', transition:'all .15s' }}>
+              <div style={{ fontSize:'0.85rem', fontWeight:600, color: tri.infra===k?'var(--accent)':'var(--text-primary)', marginBottom:2 }}>{t}</div>
+              <div style={{ fontSize:'0.75rem', color:'var(--text-secondary)' }}>{d}</div>
+            </div>
           ))}
         </div>
+      </FG>
+    </div>,
 
-        {serverError && (
-          <div style={{
-            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: '0.75rem', padding: '0.9rem 1.1rem',
-            color: '#fca5a5', fontSize: '0.875rem', marginBottom: '1.5rem',
-            display: 'flex', gap: '0.6rem', alignItems: 'center',
-          }}>
-            <span>⚠️</span> {serverError}
-          </div>
-        )}
+    // 1 — Infraestructura
+    <div key={1} style={{ display:'flex', flexDirection:'column', gap:'1.25rem' }}>
+      <div><h2 style={{ fontSize:'1.5rem', fontWeight:700, margin:'0 0 .4rem', letterSpacing:'-.02em' }}>Infraestructura y proveedores</h2>
+      <p style={{ color:'var(--text-secondary)', margin:0, fontSize:'0.9rem' }}>Determina la superficie de riesgo técnico y los controles aplicables.</p></div>
+      <FG label="¿Proveedores externos con acceso a sus sistemas o datos?" iso="A.15">
+        <Sel value={sel.providers} onChange={e=>s('providers',e.target.value)} placeholder="Seleccionar..." options={[['no','No, todo es interno'],['con','Sí, con contrato de confidencialidad'],['sin','Sí, sin contratos formales']]} />
+      </FG>
+      <FG label="¿Tienen inventario documentado de activos de información?" iso="A.8">
+        <TriGroup groupKey="inv" state={tri} onSelect={handleTri} options={DEFAULT_TRI} />
+      </FG>
+      <FG label="¿Cuántos sistemas o aplicaciones críticas tienen?" iso="A.8.1">
+        <Sel value={sel.systems} onChange={e=>s('systems',e.target.value)} placeholder="Seleccionar..." options={[['1-3','Entre 1 y 3'],['4-10','Entre 4 y 10'],['10+','Más de 10']]} />
+      </FG>
+    </div>,
 
-        <form onSubmit={handleSubmit} data-testid="onboarding-form">
-          {/* ── Two-column grid ───────────────────────────────────── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'stretch' }}>
+    // 2 — Acceso
+    <div key={2} style={{ display:'flex', flexDirection:'column', gap:'1.25rem' }}>
+      <div><div style={{ display:'flex', gap:'0.5rem', marginBottom:'0.6rem', flexWrap:'wrap' }}><Badge>A.9 Control de acceso</Badge><Badge>A.10 Criptografía</Badge></div>
+      <h2 style={{ fontSize:'1.5rem', fontWeight:700, margin:'0 0 .4rem', letterSpacing:'-.02em' }}>Identidad y protección de datos</h2>
+      <p style={{ color:'var(--text-secondary)', margin:0, fontSize:'0.9rem' }}>Tus respuestas calculan la probabilidad de riesgo en estos dominios en tiempo real.</p></div>
+      <FG label="¿Tienen proceso para dar/quitar accesos cuando alguien entra o sale?" iso="A.9.2">
+        <TriGroup groupKey="accesos" state={tri} onSelect={handleTri} options={[['no','No existe','Informal'],['sin','Existe','Sin documentar'],['ok','Documentado','Con responsable']]} />
+      </FG>
+      <FG label="¿Los sistemas críticos usan autenticación de doble factor (MFA)?" iso="A.9.4.2">
+        <TriGroup groupKey="mfa" state={tri} onSelect={handleTri} options={[['no','No existe','Solo contraseña'],['sin','Parcial','Solo algunos'],['ok','Implementado','Con evidencia']]} />
+      </FG>
+      <FG label="¿Los datos sensibles están cifrados en reposo y en tránsito?" iso="A.10.1.1">
+        <TriGroup groupKey="cripto" state={tri} onSelect={handleTri} options={[['no','No existe','Sin cifrado'],['sin','Parcial','Solo HTTPS'],['ok','Completo','Reposo + tránsito']]} />
+      </FG>
+    </div>,
 
-            {/* ── LEFT: Administrador ─────────────────────────────── */}
-            <div style={{
-              background: 'var(--panel-bg)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid var(--border)',
-              borderRadius: '1rem',
-              padding: '1.75rem',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem' }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                  background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '0.75rem', fontWeight: 700, color: '#60a5fa',
-                }}>1</div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Cuenta del administrador</div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Acceso inicial a la plataforma</div>
-                </div>
+    // 3 — Operaciones
+    <div key={3} style={{ display:'flex', flexDirection:'column', gap:'1.25rem' }}>
+      <div><div style={{ display:'flex', gap:'0.5rem', marginBottom:'0.6rem', flexWrap:'wrap' }}><Badge>A.12 Operaciones</Badge><Badge>A.17 Continuidad</Badge></div>
+      <h2 style={{ fontSize:'1.5rem', fontWeight:700, margin:'0 0 .4rem', letterSpacing:'-.02em' }}>Trazabilidad y respaldo</h2>
+      <p style={{ color:'var(--text-secondary)', margin:0, fontSize:'0.9rem' }}>La ausencia de logs y backups probados son los hallazgos más frecuentes en Pymes.</p></div>
+      <FG label="¿Tienen logs de acceso conservados por al menos 90 días?" iso="A.12.4.1">
+        <TriGroup groupKey="logs" state={tri} onSelect={handleTri} options={[['no','No existen','Sin registro'],['sin','Existen','Retención < 90d'],['ok','Configurados','≥90d, exportables']]} />
+      </FG>
+      <FG label="¿Aplican parches de seguridad con frecuencia definida?" iso="A.12.6.1">
+        <Sel value={sel.patches} onChange={e=>s('patches',e.target.value)} placeholder="Seleccionar..." options={[['nunca','Nunca / cuando recordamos'],['incidente','Solo al haber incidente'],['mensual-sr','Mensual, sin registro'],['mensual-cr','Mensual, con registro']]} />
+      </FG>
+      <FG label="¿Tienen backups probados de datos críticos?" iso="A.17.1">
+        <TriGroup groupKey="backup" state={tri} onSelect={handleTri} options={[['no','Sin backups','Sin proceso'],['sin','Backups activos','Sin prueba'],['ok','Probados','Restauración doc.']]} />
+      </FG>
+      <FG label="¿Cuánto tardarían en volver a operar si el sistema falla?" iso="A.17 RTO">
+        <Sel value={sel.rto} onChange={e=>s('rto',e.target.value)} placeholder="Seleccionar..." options={[['?','No lo sabemos'],['48+','Más de 48 horas'],['4-48','Entre 4 y 48 horas'],['<4','Menos de 4 horas (documentado)']]} />
+      </FG>
+    </div>,
+
+    // 4 — Incidentes
+    <div key={4} style={{ display:'flex', flexDirection:'column', gap:'1.25rem' }}>
+      <div><div style={{ display:'flex', gap:'0.5rem', marginBottom:'0.6rem', flexWrap:'wrap' }}><Badge>A.16 Incidentes</Badge><Badge>A.7 RRHH</Badge><Badge>A.15 Proveedores</Badge></div>
+      <h2 style={{ fontSize:'1.5rem', fontWeight:700, margin:'0 0 .4rem', letterSpacing:'-.02em' }}>Respuesta y personas</h2>
+      <p style={{ color:'var(--text-secondary)', margin:0, fontSize:'0.9rem' }}>Los procedimientos deben estar documentados y las personas deben conocerlos.</p></div>
+      <FG label="Si detectan acceso no autorizado mañana, ¿tienen documentado qué hacer?" iso="A.16.1.1">
+        <TriGroup groupKey="inc" state={tri} onSelect={handleTri} options={[['no','No existe','Actuaríamos ad-hoc'],['sin','Existe','Sin documentar'],['ok','Documentado','Responsable asignado']]} />
+      </FG>
+      <FG label="¿Sus empleados han recibido capacitación en seguridad en el último año?" iso="A.7.2.2">
+        <Sel value={sel.training} onChange={e=>s('training',e.target.value)} placeholder="Seleccionar..." options={[['nunca','Nunca han recibido'],['1año+','Hace más de un año'],['1año-sr','En el último año, sin registro'],['1año-cr','En el último año, con registro']]} />
+      </FG>
+      <FG label="¿Sus proveedores con acceso a datos tienen cláusulas de seguridad?" iso="A.15.1">
+        <Sel value={sel.providerClauses} onChange={e=>s('providerClauses',e.target.value)} placeholder="Seleccionar..." options={[['na','No tenemos proveedores con acceso'],['sin-cc','Sí, pero sin cláusulas'],['nda','Sí, con NDA básico'],['cc','Sí, con cláusulas detalladas']]} />
+      </FG>
+    </div>,
+
+    // 5 — Perfil de riesgo
+    (() => {
+      const riskList = Object.entries(riskData).map(([key,r]) => {
+        const score = calcScore(r.prob, r.impact);
+        return { key, ...r, score, ...riskMeta(score) };
+      });
+      const critical = riskList.filter(r=>r.score>=70).length;
+      const high     = riskList.filter(r=>r.score>=45&&r.score<70).length;
+      const low      = riskList.filter(r=>r.score<45).length;
+      return (
+        <div key={5} style={{ display:'flex', flexDirection:'column', gap:'1.25rem' }}>
+          <div><h2 style={{ fontSize:'1.5rem', fontWeight:700, margin:'0 0 .4rem', letterSpacing:'-.02em' }}>Tu perfil de riesgo inicial</h2>
+          <p style={{ color:'var(--text-secondary)', margin:0, fontSize:'0.9rem' }}>Calculado en base a tus respuestas. Aparecerá en el dashboard hasta que evalúes riesgos específicos por activo.</p></div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'1rem' }}>
+            {[['Críticos',critical,'var(--danger)'],['Altos',high,'var(--warning)'],['Controlados',low,'var(--success)']].map(([l,n,c]) => (
+              <div key={l} className="glass-panel" style={{ textAlign:'center', padding:'1.25rem' }}>
+                <div style={{ fontSize:'2.5rem', fontWeight:700, color:c, lineHeight:1 }}>{n}</div>
+                <div style={{ fontSize:'0.78rem', color:'var(--text-secondary)', marginTop:'0.35rem', textTransform:'uppercase', letterSpacing:'.05em' }}>{l}</div>
               </div>
-
-              <Field id="admin-name" label="Nombre completo" error={formErrors['admin.name']}>
-                <input
-                  id="admin-name" type="text" name="name"
-                  value={formData.admin.name} onChange={handleAdminChange}
-                  placeholder="Ej: María García"
-                  style={inputStyle(!!formErrors['admin.name'])}
-                  data-testid="input-admin-name"
-                />
-              </Field>
-
-              <Field id="admin-email" label="Correo electrónico" error={formErrors['admin.email']}>
-                <input
-                  id="admin-email" type="email" name="email"
-                  value={formData.admin.email} onChange={handleAdminChange}
-                  placeholder="admin@empresa.com"
-                  style={inputStyle(!!formErrors['admin.email'])}
-                  data-testid="input-admin-email"
-                />
-              </Field>
-
-              {/* Password */}
-              <Field id="admin-password" label="Contraseña" error={formErrors['admin.password']}>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    id="admin-password"
-                    type={showPassword ? 'text' : 'password'}
-                    name="password"
-                    placeholder="Mínimo 8 caracteres"
-                    value={formData.admin.password}
-                    onChange={handleAdminChange}
-                    style={{ ...inputStyle(!!formErrors['admin.password']), paddingRight: '2.75rem' }}
-                    data-testid="input-admin-password"
-                  />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} style={{
-                    position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
-                    background: 'none', border: 'none', color: 'var(--text-secondary)',
-                    cursor: 'pointer', padding: 0, display: 'flex',
-                  }} aria-label={showPassword ? 'Ocultar' : 'Mostrar'}>
-                    <EyeIcon show={showPassword} />
-                  </button>
+            ))}
+          </div>
+          <div className="glass-panel">
+            <div style={{ fontSize:'0.78rem', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:'1rem' }}>Exposición por dominio</div>
+            {riskList.map(r => (
+              <div key={r.key} style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'0.85rem' }}>
+                <span style={{ fontSize:'0.82rem', color:'var(--text-secondary)', width:185, flexShrink:0 }}>{r.label}</span>
+                <div style={{ flex:1, height:6, background:'rgba(255,255,255,.06)', borderRadius:3, overflow:'hidden' }}>
+                  <div style={{ height:6, width:`${r.score||2}%`, background:r.color, borderRadius:3, transition:'width .6s ease' }} />
                 </div>
-              </Field>
+                <span style={{ fontSize:'0.78rem', fontWeight:600, color:r.color, width:52, textAlign:'right', flexShrink:0 }}>{r.label}</span>
+              </div>
+            ))}
+          </div>
+          <FG label="¿Qué tipo de evidencia tienen disponible hoy?">
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.75rem' }}>
+              {[['doc','📄 Documento / política','PDF o Word con fecha y firma'],['config','⚙️ Configuración exportada','Captura o export del sistema'],['log','📋 Registro de actividad','Log con timestamps'],['test','🧪 Resultado de prueba','Test o simulacro documentado']].map(([k,t,d]) => (
+                <div key={k} onClick={()=>setEvSel(k)} style={{ border:`1.5px solid ${evSel===k?'var(--accent)':'var(--border)'}`, borderRadius:10, padding:'0.85rem 1rem', cursor:'pointer', background: evSel===k?'rgba(59,130,246,.08)':'rgba(255,255,255,.03)', transition:'all .15s' }}>
+                  <div style={{ fontSize:'0.85rem', fontWeight:600, color: evSel===k?'var(--accent)':'var(--text-primary)', marginBottom:2 }}>{t}</div>
+                  <div style={{ fontSize:'0.75rem', color:'var(--text-secondary)' }}>{d}</div>
+                </div>
+              ))}
+            </div>
+          </FG>
+          <div style={{ background:'rgba(245,158,11,.06)', border:'1px solid rgba(245,158,11,.2)', borderRadius:8, padding:'0.75rem 1rem', fontSize:'0.82rem', color:'var(--warning)' }}>
+            ⚠️ Una política escrita NO es evidencia de implementación. Se requieren ambas por separado.
+          </div>
+        </div>
+      );
+    })(),
 
-              {/* Strength bar */}
-              {pwd.length > 0 && (
-                <div style={{ marginTop: '-0.6rem', marginBottom: '0.9rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Seguridad</span>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: strengthColor }}>{strengthLabel}</span>
-                  </div>
-                  <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${strengthPct}%`, background: strengthColor, borderRadius: 2, transition: 'width 0.3s, background 0.3s' }} />
-                  </div>
-                  {/* Criteria grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem', marginTop: '0.6rem' }}>
-                    {[
-                      [hasMinLength, '8+ caracteres'],
-                      [hasUppercase, 'Mayúscula'],
-                      [hasLowercase, 'Minúscula'],
-                      [hasNumber,    'Número'],
-                      [hasSymbol,    'Símbolo especial'],
-                    ].map(([ok, label]) => (
-                      <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', color: ok ? 'var(--success)' : 'var(--text-secondary)' }}>
-                        <span style={{
-                          width: 12, height: 12, borderRadius: '50%', flexShrink: 0,
-                          background: ok ? 'var(--success)' : 'rgba(255,255,255,0.1)',
-                          border: ok ? 'none' : '1px solid rgba(255,255,255,0.2)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.55rem', color: 'white', fontWeight: 700,
-                        }}>{ok ? '✓' : ''}</span>
-                        {label}
+    // 6 — Activos
+    (() => {
+      const selectTemplate = (tpl) => {
+        setActiveTemplate(tpl.type);
+        setAssetDraft({ name: tpl.nameSug, description: tpl.desc, c: tpl.c, i: tpl.i, a: tpl.a, icon: tpl.icon, type: tpl.type });
+        setAssetError('');
+      };
+      const addAsset = () => {
+        if (!assetDraft?.name?.trim()) { setAssetError('El nombre del activo es obligatorio.'); return; }
+        setOnboardingAssets(prev => [...prev, { ...assetDraft, id: Date.now() }]);
+        setAssetDraft(null);
+        setActiveTemplate(null);
+        setAssetError('');
+      };
+      const removeAsset = (id) => setOnboardingAssets(prev => prev.filter(a => a.id !== id));
+      const ciaLabel = (v) => v >= 4 ? 'Alto' : v >= 3 ? 'Medio' : 'Bajo';
+      const ciaColor = (v) => v >= 4 ? 'var(--danger)' : v >= 3 ? 'var(--warning)' : 'var(--success)';
+
+      return (
+        <div key={6} style={{ display:'flex', flexDirection:'column', gap:'1.5rem' }}>
+          <div>
+            <h2 style={{ fontSize:'1.5rem', fontWeight:700, margin:'0 0 .4rem', letterSpacing:'-.02em' }}>Registro de activos</h2>
+            <p style={{ color:'var(--text-secondary)', margin:0, fontSize:'0.9rem' }}>Selecciona el tipo de activo, ajusta el nombre y los valores C-I-A. Agrega al menos uno para continuar.</p>
+          </div>
+
+          {/* Catálogo de plantillas */}
+          <div>
+            <div style={{ fontSize:'0.78rem', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:'.75rem' }}>Tipo de activo</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'.6rem' }}>
+              {ASSET_TEMPLATES.map(tpl => (
+                <div key={tpl.type} onClick={() => selectTemplate(tpl)} style={{
+                  border: `1.5px solid ${activeTemplate===tpl.type ? 'var(--accent)' : 'var(--border)'}`,
+                  borderRadius:10, padding:'.75rem .6rem', cursor:'pointer', textAlign:'center',
+                  background: activeTemplate===tpl.type ? 'rgba(59,130,246,.1)' : 'rgba(255,255,255,.03)',
+                  transition:'all .15s',
+                }}>
+                  <div style={{ fontSize:'1.5rem', marginBottom:'.3rem' }}>{tpl.icon}</div>
+                  <div style={{ fontSize:'0.8rem', fontWeight:600, color: activeTemplate===tpl.type ? 'var(--accent)' : 'var(--text-primary)' }}>{tpl.label}</div>
+                  <div style={{ fontSize:'0.7rem', color:'var(--text-secondary)', marginTop:'.2rem', lineHeight:1.3 }}>{tpl.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Formulario de draft */}
+          {assetDraft && (
+            <div style={{ background:'rgba(59,130,246,.06)', border:'1px solid rgba(59,130,246,.2)', borderRadius:12, padding:'1.25rem' }}>
+              <div style={{ fontSize:'0.78rem', fontWeight:600, color:'var(--accent)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:'1rem' }}>
+                {assetDraft.icon} Configurar activo
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:'.75rem' }}>
+                {/* Nombre */}
+                <div>
+                  <label style={{ fontSize:'0.78rem', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'.05em', display:'block', marginBottom:'.35rem' }}>
+                    Nombre del activo *
+                  </label>
+                  <input
+                    type="text" value={assetDraft.name}
+                    onChange={e => { setAssetDraft(p => ({...p, name:e.target.value})); setAssetError(''); }}
+                    style={{ background:'rgba(0,0,0,.25)', border:`1px solid ${assetError?'rgba(239,68,68,.6)':'rgba(255,255,255,.12)'}`, borderRadius:8, padding:'.65rem .9rem', color:'var(--text-primary)', fontSize:'.9rem', outline:'none', width:'100%', boxSizing:'border-box' }}
+                    placeholder="Ej: Servidor de producción, BD de clientes…"
+                  />
+                  {assetError && <span style={{ fontSize:'.75rem', color:'var(--danger)' }}>{assetError}</span>}
+                </div>
+
+                {/* Sliders C-I-A */}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'1rem' }}>
+                  {[['c','Confidencialidad','🔒'],['i','Integridad','🔏'],['a','Disponibilidad','⚡']].map(([k,label,icon]) => (
+                    <div key={k}>
+                      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'.3rem' }}>
+                        <span style={{ fontSize:'.78rem', color:'var(--text-secondary)', fontWeight:600 }}>{icon} {label}</span>
+                        <span style={{ fontSize:'.78rem', fontWeight:700, color:ciaColor(assetDraft[k]) }}>{assetDraft[k]}/5 — {ciaLabel(assetDraft[k])}</span>
                       </div>
-                    ))}
-                  </div>
+                      <input type="range" min="1" max="5" value={assetDraft[k]}
+                        onChange={e => setAssetDraft(p => ({...p, [k]:parseInt(e.target.value)}))}
+                        style={{ width:'100%' }}
+                      />
+                    </div>
+                  ))}
                 </div>
-              )}
 
-              {/* Confirm password */}
-              <Field id="admin-confirm-password" label="Confirmar contraseña" error={formErrors['admin.confirmPassword']}>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    id="admin-confirm-password"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    name="confirmPassword"
-                    placeholder="Repite tu contraseña"
-                    value={formData.admin.confirmPassword}
-                    onChange={handleAdminChange}
-                    style={{ ...inputStyle(!!formErrors['admin.confirmPassword']), paddingRight: '2.75rem' }}
-                    data-testid="input-admin-confirm-password"
-                  />
-                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} style={{
-                    position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
-                    background: 'none', border: 'none', color: 'var(--text-secondary)',
-                    cursor: 'pointer', padding: 0, display: 'flex',
-                  }} aria-label={showConfirmPassword ? 'Ocultar' : 'Mostrar'}>
-                    <EyeIcon show={showConfirmPassword} />
+                {/* Resumen CIA */}
+                <div style={{ display:'flex', gap:'.5rem', alignItems:'center' }}>
+                  {[['C',assetDraft.c],['I',assetDraft.i],['A',assetDraft.a]].map(([k,v]) => (
+                    <span key={k} style={{ fontSize:'.75rem', fontWeight:700, color:ciaColor(v), background:`${ciaColor(v)}18`, border:`1px solid ${ciaColor(v)}33`, borderRadius:6, padding:'2px 8px' }}>{k}:{v}</span>
+                  ))}
+                  <span style={{ fontSize:'.75rem', color:'var(--text-secondary)', marginLeft:'.25rem' }}>
+                    Total CIA: <strong style={{ color:'var(--text-primary)' }}>{assetDraft.c+assetDraft.i+assetDraft.a}/15</strong>
+                  </span>
+                  <button onClick={addAsset} className="btn-primary" style={{ marginLeft:'auto', padding:'.5rem 1.25rem', fontSize:'.85rem' }}>
+                    + Agregar activo
                   </button>
                 </div>
-              </Field>
+              </div>
             </div>
+          )}
 
-            {/* ── RIGHT: Organización ─────────────────────────────── */}
-            <div style={{
-              background: 'var(--panel-bg)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid var(--border)',
-              borderRadius: '1rem',
-              padding: '1.75rem',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem' }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                  background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '0.75rem', fontWeight: 700, color: '#34d399',
-                }}>2</div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Datos de la organización</div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Contexto institucional</div>
-                </div>
+          {/* Lista de activos agregados */}
+          {onboardingAssets.length > 0 && (
+            <div>
+              <div style={{ fontSize:'0.78rem', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:'.6rem' }}>
+                Activos registrados ({onboardingAssets.length})
               </div>
-
-              <Field id="org-name" label="Nombre de la empresa" error={formErrors['organization.name']}>
-                <input
-                  id="org-name" type="text" name="name"
-                  value={formData.organization.name} onChange={handleOrgChange}
-                  placeholder="Ej: Acme Technologies S.A."
-                  style={inputStyle(!!formErrors['organization.name'])}
-                  data-testid="input-org-name"
-                />
-              </Field>
-
-              <Field id="org-industry" label="Industria / Sector" error={formErrors['organization.industry']}>
-                <input
-                  id="org-industry" type="text" name="industry"
-                  value={formData.organization.industry} onChange={handleOrgChange}
-                  placeholder="Ej: Tecnología, Salud, Finanzas…"
-                  style={inputStyle(!!formErrors['organization.industry'])}
-                  data-testid="input-org-industry"
-                />
-              </Field>
-
-              <Field id="org-size" label="Tamaño de la empresa" error={formErrors['organization.size']}>
-                <select
-                  id="org-size" name="size"
-                  value={formData.organization.size} onChange={handleOrgChange}
-                  style={{ ...inputStyle(!!formErrors['organization.size']), cursor: 'pointer' }}
-                  data-testid="select-org-size"
-                >
-                  <option value="MICRO">Micro — 1 a 9 empleados</option>
-                  <option value="SMALL">Pequeña — 10 a 49 empleados</option>
-                  <option value="MEDIUM">Mediana — 50 a 249 empleados</option>
-                  <option value="LARGE">Grande — 250 o más empleados</option>
-                </select>
-              </Field>
-
-              {/* ISO clause callout */}
-              <div style={{
-                marginTop: '0.5rem',
-                background: 'rgba(59,130,246,0.06)',
-                border: '1px solid rgba(59,130,246,0.15)',
-                borderRadius: '0.6rem',
-                padding: '0.75rem 0.9rem',
-                fontSize: '0.75rem',
-                color: 'var(--text-secondary)',
-                lineHeight: 1.5,
-              }}>
-                📌 Esta información corresponde a la <strong style={{ color: '#60a5fa' }}>Cláusula 4.1</strong> de ISO 27001 — Comprender el contexto de la organización.
+              <div style={{ display:'flex', flexDirection:'column', gap:'.5rem' }}>
+                {onboardingAssets.map(a => {
+                  const total = a.c + a.i + a.a;
+                  const critColor = total >= 12 ? 'var(--danger)' : total >= 8 ? 'var(--warning)' : 'var(--success)';
+                  return (
+                    <div key={a.id} style={{ display:'flex', alignItems:'center', gap:'.75rem', padding:'.65rem 1rem', background:'rgba(16,185,129,.04)', border:'1px solid rgba(16,185,129,.15)', borderRadius:8 }}>
+                      <span style={{ fontSize:'1.1rem' }}>{a.icon}</span>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:'.88rem', fontWeight:600 }}>{a.name}</div>
+                        <div style={{ fontSize:'.75rem', color:'var(--text-secondary)' }}>{a.description}</div>
+                      </div>
+                      <div style={{ display:'flex', gap:'.3rem' }}>
+                        {[['C',a.c],['I',a.i],['A',a.a]].map(([k,v]) => (
+                          <span key={k} style={{ fontSize:'.7rem', fontWeight:700, color:ciaColor(v), background:`${ciaColor(v)}18`, border:`1px solid ${ciaColor(v)}33`, borderRadius:5, padding:'1px 6px' }}>{k}:{v}</span>
+                        ))}
+                      </div>
+                      <span style={{ fontSize:'.72rem', fontWeight:700, color:critColor, background:`${critColor}18`, border:`1px solid ${critColor}33`, borderRadius:6, padding:'2px 8px', flexShrink:0 }}>
+                        {total}/15
+                      </span>
+                      <button onClick={() => removeAsset(a.id)} style={{ background:'none', border:'none', color:'var(--text-secondary)', cursor:'pointer', fontSize:'1rem', padding:'.2rem', lineHeight:1 }} title="Eliminar">✕</button>
+                    </div>
+                  );
+                })}
               </div>
+            </div>
+          )}
+
+          {onboardingAssets.length === 0 && !assetDraft && (
+            <div style={{ textAlign:'center', padding:'1.5rem', background:'rgba(245,158,11,.05)', border:'1px dashed rgba(245,158,11,.3)', borderRadius:10 }}>
+              <p style={{ color:'var(--warning)', fontSize:'.88rem', margin:0 }}>⚠️ Selecciona al menos un tipo de activo y agrégalo para continuar.</p>
+            </div>
+          )}
+        </div>
+      );
+    })(),
+
+    // 7 — Revisión
+    <div key={7} style={{ display:'flex', flexDirection:'column', gap:'1.25rem' }}>
+      <div><h2 style={{ fontSize:'1.5rem', fontWeight:700, margin:'0 0 .4rem', letterSpacing:'-.02em' }}>Revisión y compromisos</h2>
+      <p style={{ color:'var(--text-secondary)', margin:0, fontSize:'0.9rem' }}>Un auditor externo rechazará evidencias que nadie interno haya validado.</p></div>
+      <FG label="Responsable interno de seguridad" iso="segunda firma requerida">
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.75rem' }}>
+          {['Nombre completo','Cargo o rol'].map(ph => (
+            <input key={ph} placeholder={ph} style={{ background:'rgba(0,0,0,.25)', border:'1px solid var(--border)', borderRadius:8, padding:'0.7rem 1rem', color:'var(--text-primary)', fontSize:'0.9rem', outline:'none' }} />
+          ))}
+        </div>
+      </FG>
+      <FG label="Checklist de compromisos auditables">
+        <div style={{ display:'flex', flexDirection:'column', gap:'0.5rem' }}>
+          {[['r1','Las evidencias serán revisadas por otra persona antes de cada auditoría','A.6'],['r2','Los controles se revisarán al menos cada 12 meses','Cláusula 9'],['r3','Los hallazgos tendrán un plazo de subsanación definido','Cláusula 10'],['r4','Los cambios en controles quedarán en historial con fecha y responsable','A.12.4'],['r5','El SoA (Declaración de Aplicabilidad) será mantenido actualizado','Anexo A']].map(([k,txt,iso]) => (
+            <div key={k} onClick={()=>setChecks(p=>({...p,[k]:!p[k]}))} style={{ display:'flex', alignItems:'center', gap:'0.75rem', background: checks[k]?'rgba(16,185,129,.06)':'rgba(255,255,255,.03)', border:`1px solid ${checks[k]?'rgba(16,185,129,.3)':'var(--border)'}`, borderRadius:8, padding:'0.75rem 1rem', cursor:'pointer', transition:'all .15s' }}>
+              <div style={{ width:18, height:18, borderRadius:4, flexShrink:0, border:`2px solid ${checks[k]?'var(--success)':'var(--border)'}`, background: checks[k]?'var(--success)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', transition:'all .15s' }}>
+                {checks[k] && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+              </div>
+              <span style={{ fontSize:'0.85rem', color:'var(--text-secondary)', flex:1 }}>{txt}</span>
+              <span style={{ fontSize:'0.7rem', color:'var(--success)', background:'rgba(16,185,129,.1)', border:'1px solid rgba(16,185,129,.2)', borderRadius:10, padding:'1px 7px', flexShrink:0, fontWeight:600 }}>{iso}</span>
+            </div>
+          ))}
+        </div>
+      </FG>
+      <FG label="Frecuencia de revisión interna comprometida">
+        <Sel value={sel.reviewFrequency} onChange={e=>s('reviewFrequency',e.target.value)} options={[['6m','Cada 6 meses'],['12m','Cada 12 meses (mínimo ISO)'],['3m','Trimestral']]} />
+      </FG>
+      {error && <div style={{ background:'rgba(239,68,68,.08)', border:'1px solid rgba(239,68,68,.3)', borderRadius:8, padding:'0.75rem 1rem', fontSize:'0.85rem', color:'var(--danger)' }}>{error}</div>}
+    </div>,
+  ];
+
+  const pct = Math.round((step / (STEPS.length - 1)) * 100);
+
+  return (
+    <div style={{ minHeight:'100vh', background:'var(--bg-color)', display:'flex', flexDirection:'column' }}>
+      <style>{`select option { background: #2d3748; color: #f8fafc; }`}</style>
+
+      {/* Header */}
+      <div style={{ borderBottom:'1px solid var(--border)', padding:'0.85rem 2rem', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:10, background:'rgba(15,23,42,.9)', backdropFilter:'blur(12px)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'0.6rem' }}>
+          <img src="/logo.png" alt="CompliSec" width={28} height={28} style={{ borderRadius:6, objectFit:'contain' }} onError={e=>{e.target.style.display='none';}} />
+          <span style={{ fontWeight:700, fontSize:'1rem' }}>Compli<span style={{ color:'var(--success)' }}>Sec</span></span>
+          <span style={{ fontSize:'0.8rem', color:'var(--text-secondary)', marginLeft:4 }}>— Diagnóstico ISO 27001</span>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:'1rem' }}>
+          {userName && <span style={{ fontSize:'0.85rem', color:'var(--text-secondary)' }}>Hola, {userName.split(' ')[0]} 👋</span>}
+          <button onClick={()=>onComplete([])} style={{ background:'none', border:'1px solid var(--border)', color:'var(--text-secondary)', fontSize:'0.8rem', padding:'0.35rem 0.9rem', borderRadius:6, cursor:'pointer' }}>
+            Completar más tarde
+          </button>
+        </div>
+      </div>
+
+      {/* Banner de progreso guardado */}
+      {showResume && (
+        <div style={{ background:'rgba(59,130,246,.1)', borderBottom:'1px solid rgba(59,130,246,.2)', padding:'0.65rem 2rem', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'1rem' }}>
+          <span style={{ fontSize:'0.85rem', color:'var(--text-primary)' }}>
+            💾 Tienes un diagnóstico en progreso guardado — estás en el paso {step + 1} de {STEPS.length}.
+          </span>
+          <button
+            onClick={() => { clearSaved(); setStep(0); setTri({}); setChecks({}); setOnboardingAssets([]); setSels({ dataSensitivity:'', regulation:'No aplica', providers:'', systems:'', patches:'', rto:'', training:'', providerClauses:'', reviewFrequency:'12m' }); setRiskData({ acceso:{label:'Control de acceso (A.9)',prob:0,impact:0}, cripto:{label:'Criptografía (A.10)',prob:0,impact:0}, ops:{label:'Operaciones (A.12)',prob:0,impact:0}, inc:{label:'Incidentes (A.16)',prob:0,impact:0}, cont:{label:'Continuidad (A.17)',prob:0,impact:0} }); setShowResume(false); }}
+            style={{ background:'none', border:'1px solid rgba(59,130,246,.4)', color:'var(--accent)', fontSize:'0.78rem', padding:'0.3rem 0.85rem', borderRadius:6, cursor:'pointer', whiteSpace:'nowrap' }}
+          >
+            Empezar de nuevo
+          </button>
+        </div>
+      )}
+
+      {/* Contenido — sidebar + área principal */}
+      <div style={{ flex:1, maxWidth:1000, width:'100%', margin:'0 auto', padding:'2.5rem 1.5rem', display:'flex', gap:'1.5rem', alignItems:'flex-start' }}>
+
+        {/* Sidebar vertical */}
+        <div className="glass-panel" style={{ width:210, flexShrink:0, padding:'1.25rem 1rem', position:'sticky', top:'4.5rem' }}>
+          <div style={{ marginBottom:'1.25rem' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'0.4rem' }}>
+              <span style={{ fontSize:'0.72rem', color:'var(--text-secondary)' }}>Progreso</span>
+              <span style={{ fontSize:'0.72rem', color:'var(--success)', fontWeight:700 }}>{pct}%</span>
+            </div>
+            <div style={{ height:3, background:'rgba(255,255,255,.06)', borderRadius:2, overflow:'hidden' }}>
+              <div style={{ height:3, width:`${pct}%`, background:'linear-gradient(90deg,var(--accent),var(--success))', borderRadius:2, transition:'width .4s ease' }} />
             </div>
           </div>
+          <Stepbar />
+        </div>
 
-          {/* ── Submit ─────────────────────────────────────────────── */}
-          <div style={{ marginTop: '1.75rem', textAlign: 'center' }}>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              data-testid="submit-btn"
-              style={{
-                background: isSubmitting ? 'rgba(59,130,246,0.4)' : 'linear-gradient(135deg, #3b82f6 0%, #10b981 100%)',
-                border: 'none', borderRadius: '0.75rem',
-                color: 'white', fontWeight: 700, fontSize: '1rem',
-                padding: '0.9rem 3rem', cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                transition: 'opacity 0.2s, transform 0.1s',
-                boxShadow: isSubmitting ? 'none' : '0 0 24px rgba(59,130,246,0.3)',
-                letterSpacing: '0.02em',
-              }}
-              onMouseEnter={e => { if (!isSubmitting) e.target.style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={e => { e.target.style.transform = 'none'; }}
-            >
-              {isSubmitting ? (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
-                  <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                  Configurando plataforma…
-                </span>
-              ) : '🚀 Comenzar implementación ISO 27001'}
+        {/* Área de contenido */}
+        <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:'1.25rem' }}>
+          <div className="glass-panel" style={{ padding:'2rem' }}>
+            {steps[step]}
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <button onClick={()=>step>0&&setStep(s=>s-1)} disabled={step===0} style={{ padding:'0.75rem 1.75rem', borderRadius:8, fontSize:'0.9rem', fontWeight:600, cursor: step===0?'not-allowed':'pointer', background:'transparent', color: step===0?'var(--border)':'var(--text-secondary)', border:`1px solid ${step===0?'var(--border)':'rgba(255,255,255,.15)'}` }}>
+              ← Anterior
             </button>
-
-            <p style={{ marginTop: '1rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-              Al continuar, aceptas que esta plataforma procesará los datos de tu organización para la gestión del SGSI.
-            </p>
+            <span style={{ fontSize:'0.78rem', color:'var(--text-secondary)' }}>Paso {step+1} de {STEPS.length}</span>
+            {step < STEPS.length-1 ? (
+              <button
+                onClick={()=>setStep(s=>s+1)}
+                className="btn-primary"
+                disabled={step === 6 && onboardingAssets.length === 0}
+                style={{ padding:'0.75rem 1.75rem', fontSize:'0.9rem', opacity: step === 6 && onboardingAssets.length === 0 ? 0.45 : 1, cursor: step === 6 && onboardingAssets.length === 0 ? 'not-allowed' : 'pointer' }}
+                title={step === 6 && onboardingAssets.length === 0 ? 'Agrega al menos un activo para continuar' : ''}
+              >
+                Siguiente →
+              </button>
+            ) : (
+              <button onClick={handleFinish} disabled={saving} className="btn-primary" style={{ padding:'0.75rem 2rem', fontSize:'0.9rem', opacity:saving?0.7:1, cursor:saving?'not-allowed':'pointer' }}>
+                {saving ? 'Guardando...' : '✅ Generar perfil de cumplimiento'}
+              </button>
+            )}
           </div>
-        </form>
-
-        <style>{`
-          @keyframes spin { to { transform: rotate(360deg); } }
-          input::placeholder, textarea::placeholder { color: rgba(148,163,184,0.5); }
-          input:focus, select:focus {
-            border-color: rgba(59,130,246,0.5) !important;
-            box-shadow: 0 0 0 2px rgba(59,130,246,0.15) !important;
-          }
-          select option { background: #2d3748; color: #f8fafc; }
-        `}</style>
+        </div>
       </div>
     </div>
   );
 };
 
-export default OnboardingForm;
+export default DiagnosticWizard;

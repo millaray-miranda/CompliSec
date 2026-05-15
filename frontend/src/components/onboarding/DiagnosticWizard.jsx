@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from '../../utils/axiosSetup';
+
+const STORAGE_KEY = 'compliSec_diagnostic_progress';
 
 const calcScore = (prob, impact) => Math.round((prob / 100) * (impact / 100) * 100);
 
@@ -65,23 +67,43 @@ const Badge = ({ children }) => (
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────────────────────
 const DiagnosticWizard = ({ organizationId, userName, onComplete }) => {
-  const [step, setStep]     = useState(0);
-  const [tri, setTri]       = useState({});
-  const [checks, setChecks] = useState({});
+  // Carga estado guardado si existe
+  const loadSaved = () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  };
+  const saved = loadSaved();
+
+  const [step, setStep]     = useState(saved?.step     ?? 0);
+  const [tri, setTri]       = useState(saved?.tri      ?? {});
+  const [checks, setChecks] = useState(saved?.checks   ?? {});
   const [evSel, setEvSel]   = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
+  const [showResume, setShowResume] = useState(!!saved && saved.step > 0);
 
-  const [sel, setSels] = useState({ dataSensitivity:'', regulation:'No aplica', providers:'', systems:'', patches:'', rto:'', training:'', providerClauses:'' });
+  const [sel, setSels] = useState(saved?.sel ?? { dataSensitivity:'', regulation:'No aplica', providers:'', systems:'', patches:'', rto:'', training:'', providerClauses:'' });
   const s = (k,v) => setSels(p => ({...p, [k]:v}));
 
-  const [riskData, setRiskData] = useState({
+  const [riskData, setRiskData] = useState(saved?.riskData ?? {
     acceso: { label:'Control de acceso (A.9)', prob:0, impact:0 },
     cripto: { label:'Criptografía (A.10)',      prob:0, impact:0 },
     ops:    { label:'Operaciones (A.12)',        prob:0, impact:0 },
     inc:    { label:'Incidentes (A.16)',         prob:0, impact:0 },
     cont:   { label:'Continuidad (A.17)',        prob:0, impact:0 },
   });
+
+  // Auto-guardar en localStorage cuando cambia el estado
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ step, tri, checks, sel, riskData }));
+    } catch { /* quota exceeded, ignore */ }
+  }, [step, tri, checks, sel, riskData]);
+
+  // Limpiar al finalizar
+  const clearSaved = () => { try { localStorage.removeItem(STORAGE_KEY); } catch {} };
 
   const handleTri = (group, v) => {
     setTri(prev => ({...prev, [group]:v}));
@@ -107,6 +129,7 @@ const DiagnosticWizard = ({ organizationId, userName, onComplete }) => {
     });
     try {
       await axios.post('/api/diagnostic', { organization_id:organizationId, risks });
+      clearSaved();
       onComplete(risks);
     } catch {
       setError('No se pudo guardar el diagnóstico. Puedes intentarlo más tarde desde el dashboard.');
@@ -344,6 +367,21 @@ const DiagnosticWizard = ({ organizationId, userName, onComplete }) => {
           </button>
         </div>
       </div>
+
+      {/* Banner de progreso guardado */}
+      {showResume && (
+        <div style={{ background:'rgba(59,130,246,.1)', borderBottom:'1px solid rgba(59,130,246,.2)', padding:'0.65rem 2rem', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'1rem' }}>
+          <span style={{ fontSize:'0.85rem', color:'var(--text-primary)' }}>
+            💾 Tienes un diagnóstico en progreso guardado — estás en el paso {step + 1} de {STEPS.length}.
+          </span>
+          <button
+            onClick={() => { clearSaved(); setStep(0); setTri({}); setChecks({}); setSels({ dataSensitivity:'', regulation:'No aplica', providers:'', systems:'', patches:'', rto:'', training:'', providerClauses:'' }); setRiskData({ acceso:{label:'Control de acceso (A.9)',prob:0,impact:0}, cripto:{label:'Criptografía (A.10)',prob:0,impact:0}, ops:{label:'Operaciones (A.12)',prob:0,impact:0}, inc:{label:'Incidentes (A.16)',prob:0,impact:0}, cont:{label:'Continuidad (A.17)',prob:0,impact:0} }); setShowResume(false); }}
+            style={{ background:'none', border:'1px solid rgba(59,130,246,.4)', color:'var(--accent)', fontSize:'0.78rem', padding:'0.3rem 0.85rem', borderRadius:6, cursor:'pointer', whiteSpace:'nowrap' }}
+          >
+            Empezar de nuevo
+          </button>
+        </div>
+      )}
 
       {/* Contenido — sidebar + área principal */}
       <div style={{ flex:1, maxWidth:1000, width:'100%', margin:'0 auto', padding:'2.5rem 1.5rem', display:'flex', gap:'1.5rem', alignItems:'flex-start' }}>

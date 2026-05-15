@@ -1,23 +1,21 @@
 import React, { useState } from 'react';
 import axios from '../../utils/axiosSetup';
 
-/**
- * Formulario para registrar y evaluar un riesgo sobre un activo.
- * Calcula el nivel de riesgo como Probabilidad × Impacto (ISO 27005).
- */
-const RiskForm = ({ organizationId, assetId, onSuccess, onCancel }) => {
+const RiskForm = ({ organizationId, assetId, initialData, onSuccess, onCancel }) => {
+  const isEditing = !!initialData;
+
   const [formData, setFormData] = useState({
     organization_id:    organizationId,
     asset_id:           assetId,
-    threat:             '',
-    vulnerability:      '',
-    likelihood:         3,
-    impact:             3,
-    treatment_decision: 'MITIGATE',
+    threat:             initialData?.threat             || '',
+    vulnerability:      initialData?.vulnerability      || '',
+    likelihood:         initialData?.likelihood         ?? 3,
+    impact:             initialData?.impact             ?? 3,
+    treatment_decision: initialData?.treatment_decision || 'MITIGATE',
   });
 
-  const [formErrors, setFormErrors]   = useState({});
-  const [serverError, setServerError] = useState('');
+  const [formErrors, setFormErrors]     = useState({});
+  const [serverError, setServerError]   = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
@@ -28,15 +26,22 @@ const RiskForm = ({ organizationId, assetId, onSuccess, onCancel }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setFormErrors({});
-    setServerError('');
+    setIsSubmitting(true); setFormErrors({}); setServerError('');
+
+    // Validación local
+    const errs = {};
+    if (!formData.threat.trim())         errs.threat        = 'La amenaza es obligatoria.';
+    if (!formData.vulnerability.trim())  errs.vulnerability = 'La vulnerabilidad es obligatoria.';
+    if (Object.keys(errs).length) { setFormErrors(errs); setIsSubmitting(false); return; }
 
     try {
-      const response = await axios.post('/api/risks', formData);
-      if (response.status === 201) {
-        onSuccess(response.data.data);
+      let response;
+      if (isEditing) {
+        response = await axios.put(`/api/risks/${initialData.id}`, formData);
+      } else {
+        response = await axios.post('/api/risks', formData);
       }
+      onSuccess(response.data.data);
     } catch (error) {
       if (error.response?.status === 400 && error.response.data.details) {
         const map = {};
@@ -55,10 +60,10 @@ const RiskForm = ({ organizationId, assetId, onSuccess, onCancel }) => {
   const riskLabel = riskScore >= 15 ? 'CRÍTICO' : riskScore >= 8 ? 'ALTO' : 'BAJO';
 
   return (
-    <div className="glass-panel" style={{ marginTop: '1rem', borderLeft: '4px solid var(--accent)' }}>
+    <div className="glass-panel" style={{ marginTop:'1rem', borderLeft:`4px solid ${isEditing ? 'var(--warning)' : 'var(--accent)'}` }}>
       <form onSubmit={handleSubmit} data-testid="risk-form">
         <fieldset>
-          <legend>Evaluar Riesgo</legend>
+          <legend>{isEditing ? `✏️ Editando riesgo: ${initialData.threat}` : 'Evaluar Riesgo'}</legend>
 
           {serverError && <div className="alert-error">{serverError}</div>}
 
@@ -86,43 +91,32 @@ const RiskForm = ({ organizationId, assetId, onSuccess, onCancel }) => {
             {formErrors.vulnerability && <span className="error-text" data-testid="error-risk-vuln">{formErrors.vulnerability}</span>}
           </div>
 
-          {/* Sliders + score en vivo */}
-          <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '0.75rem', padding: '1rem', marginTop: '0.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
-              <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Valoración del riesgo</span>
-              <span style={{ fontWeight: 700, color: riskColor, fontSize: '1.1rem' }}>
-                Nivel: {riskScore} — {riskLabel}
-              </span>
+          <div style={{ background:'rgba(0,0,0,0.15)', borderRadius:'.75rem', padding:'1rem', marginTop:'.5rem' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'1rem', alignItems:'center' }}>
+              <span style={{ fontWeight:600, fontSize:'.9rem' }}>Valoración del riesgo</span>
+              <span style={{ fontWeight:700, color:riskColor, fontSize:'1.1rem' }}>Nivel: {riskScore} — {riskLabel}</span>
             </div>
-            <div style={{ display: 'flex', gap: '2rem' }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <label>Probabilidad</label>
-                  <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{formData.likelihood}/5</span>
+            <div style={{ display:'flex', gap:'2rem' }}>
+              {[
+                { name:'likelihood', label:'Probabilidad' },
+                { name:'impact',     label:'Impacto' },
+              ].map(({ name, label }) => (
+                <div className="form-group" key={name} style={{ flex:1 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between' }}>
+                    <label>{label}</label>
+                    <span style={{ fontWeight:700, color:'var(--accent)' }}>{formData[name]}/5</span>
+                  </div>
+                  <input
+                    type="range" min="1" max="5" name={name}
+                    value={formData[name]} onChange={handleChange} style={{ width:'100%' }}
+                    data-testid={`slider-risk-${name}`}
+                  />
                 </div>
-                <input
-                  type="range" min="1" max="5" name="likelihood"
-                  value={formData.likelihood} onChange={handleChange}
-                  style={{ width: '100%' }}
-                  data-testid="slider-risk-likelihood"
-                />
-              </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <label>Impacto</label>
-                  <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{formData.impact}/5</span>
-                </div>
-                <input
-                  type="range" min="1" max="5" name="impact"
-                  value={formData.impact} onChange={handleChange}
-                  style={{ width: '100%' }}
-                  data-testid="slider-risk-impact"
-                />
-              </div>
+              ))}
             </div>
           </div>
 
-          <div className="form-group" style={{ marginTop: '1rem' }}>
+          <div className="form-group" style={{ marginTop:'1rem' }}>
             <label htmlFor="treatment-decision">Decisión de Tratamiento</label>
             <select
               id="treatment-decision" name="treatment_decision"
@@ -135,15 +129,12 @@ const RiskForm = ({ organizationId, assetId, onSuccess, onCancel }) => {
               <option value="TRANSFER">Transferir — Seguro o tercerización</option>
               <option value="AVOID">Evitar — Cesar la actividad</option>
             </select>
-            {formErrors.treatment_decision && <span className="error-text">{formErrors.treatment_decision}</span>}
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-            <button type="button" className="btn-primary outline" onClick={onCancel}>
-              Cancelar
-            </button>
-            <button type="submit" className="btn-primary" disabled={isSubmitting} data-testid="submit-risk-btn">
-              {isSubmitting ? 'Guardando...' : 'Guardar Perfil de Riesgo'}
+          <div style={{ display:'flex', gap:'1rem', marginTop:'1.5rem' }}>
+            <button type="button" className="btn-primary outline" onClick={onCancel}>Cancelar</button>
+            <button type="submit" className="btn-primary" disabled={isSubmitting} data-testid="submit-risk-btn" style={{ flex:1 }}>
+              {isSubmitting ? 'Guardando…' : isEditing ? '💾 Guardar cambios' : 'Guardar Perfil de Riesgo'}
             </button>
           </div>
         </fieldset>

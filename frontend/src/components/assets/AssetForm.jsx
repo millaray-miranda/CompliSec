@@ -1,22 +1,20 @@
 import React, { useState } from 'react';
 import axios from '../../utils/axiosSetup';
 
-/**
- * Formulario para registrar un activo de información.
- * Evalúa confidencialidad, integridad y disponibilidad (C-I-A).
- */
-const AssetForm = ({ organizationId, onSuccess }) => {
+const AssetForm = ({ organizationId, initialData, onSuccess, onCancel }) => {
+  const isEditing = !!initialData;
+
   const [formData, setFormData] = useState({
-    name:                 '',
-    description:          '',
-    confidentiality_req:  3,
-    integrity_req:        3,
-    availability_req:     3,
-    organization_id:      organizationId,
+    name:                initialData?.name                || '',
+    description:         initialData?.description         || '',
+    confidentiality_req: initialData?.confidentiality_req ?? 3,
+    integrity_req:       initialData?.integrity_req       ?? 3,
+    availability_req:    initialData?.availability_req    ?? 3,
+    organization_id:     organizationId,
   });
 
-  const [formErrors, setFormErrors]   = useState({});
-  const [serverError, setServerError] = useState('');
+  const [formErrors, setFormErrors]     = useState({});
+  const [serverError, setServerError]   = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
@@ -27,15 +25,20 @@ const AssetForm = ({ organizationId, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setFormErrors({});
-    setServerError('');
+    setIsSubmitting(true); setFormErrors({}); setServerError('');
+    // Validación local
+    const errs = {};
+    if (!formData.name.trim()) errs.name = 'El nombre del activo es obligatorio.';
+    if (Object.keys(errs).length) { setFormErrors(errs); setIsSubmitting(false); return; }
 
     try {
-      const response = await axios.post('/api/assets', formData);
-      if (response.status === 201) {
-        onSuccess(response.data.data);
+      let response;
+      if (isEditing) {
+        response = await axios.put(`/api/assets/${initialData.id}`, formData);
+      } else {
+        response = await axios.post('/api/assets', formData);
       }
+      onSuccess(response.data.data);
     } catch (error) {
       if (error.response?.status === 400 && error.response.data.details) {
         const map = {};
@@ -49,14 +52,14 @@ const AssetForm = ({ organizationId, onSuccess }) => {
     }
   };
 
-  const riskScore = formData.confidentiality_req + formData.integrity_req + formData.availability_req;
+  const riskScore  = formData.confidentiality_req + formData.integrity_req + formData.availability_req;
   const scoreColor = riskScore >= 12 ? 'var(--danger)' : riskScore >= 8 ? 'var(--warning)' : 'var(--success)';
 
   return (
-    <div className="glass-panel" style={{ marginBottom: '2rem' }}>
+    <div className="glass-panel" style={{ marginBottom: '2rem', borderLeft: isEditing ? '4px solid var(--warning)' : undefined }}>
       <form onSubmit={handleSubmit} data-testid="asset-form">
         <fieldset>
-          <legend>Registrar Activo de Información</legend>
+          <legend>{isEditing ? `✏️ Editando: ${initialData.name}` : 'Registrar Activo de Información'}</legend>
 
           {serverError && <div className="alert-error">{serverError}</div>}
 
@@ -82,45 +85,37 @@ const AssetForm = ({ organizationId, onSuccess }) => {
             />
           </div>
 
-          {/* Sliders C-I-A */}
-          <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '0.75rem', padding: '1rem', marginTop: '0.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
-              <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Valoración C-I-A</span>
-              <span style={{ fontWeight: 700, color: scoreColor }}>
-                Criticidad: {riskScore}/15
-              </span>
+          <div style={{ background:'rgba(0,0,0,0.15)', borderRadius:'.75rem', padding:'1rem', marginTop:'.5rem' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'1rem', alignItems:'center' }}>
+              <span style={{ fontWeight:600, fontSize:'.9rem' }}>Valoración C-I-A</span>
+              <span style={{ fontWeight:700, color:scoreColor }}>Criticidad: {riskScore}/15</span>
             </div>
-
             {[
-              { name: 'confidentiality_req', label: 'Confidencialidad', hint: 'Impacto si los datos son expuestos' },
-              { name: 'integrity_req',       label: 'Integridad',       hint: 'Impacto si los datos son alterados' },
-              { name: 'availability_req',    label: 'Disponibilidad',   hint: 'Impacto si el activo deja de funcionar' },
+              { name:'confidentiality_req', label:'Confidencialidad', hint:'Impacto si los datos son expuestos' },
+              { name:'integrity_req',       label:'Integridad',       hint:'Impacto si los datos son alterados' },
+              { name:'availability_req',    label:'Disponibilidad',   hint:'Impacto si el activo deja de funcionar' },
             ].map(({ name, label, hint }) => (
-              <div className="form-group" key={name} style={{ marginBottom: '0.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <label style={{ marginBottom: 0 }}>{label}</label>
-                  <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{formData[name]}/5</span>
+              <div className="form-group" key={name} style={{ marginBottom:'.75rem' }}>
+                <div style={{ display:'flex', justifyContent:'space-between' }}>
+                  <label style={{ marginBottom:0 }}>{label}</label>
+                  <span style={{ fontWeight:700, color:'var(--accent)' }}>{formData[name]}/5</span>
                 </div>
-                <input
-                  type="range" min="1" max="5" name={name}
-                  value={formData[name]} onChange={handleChange}
-                  style={{ width: '100%' }}
-                  data-testid={`slider-asset-${name[0]}`}
-                />
+                <input type="range" min="1" max="5" name={name} value={formData[name]} onChange={handleChange} style={{ width:'100%' }} data-testid={`slider-asset-${name[0]}`} />
                 <span className="text-secondary text-small">{hint}</span>
               </div>
             ))}
           </div>
 
-          <button
-            type="submit"
-            className="btn-primary full-width"
-            disabled={isSubmitting}
-            data-testid="submit-asset-btn"
-            style={{ marginTop: '1rem' }}
-          >
-            {isSubmitting ? 'Guardando...' : 'Guardar Activo'}
-          </button>
+          <div style={{ display:'flex', gap:'1rem', marginTop:'1rem' }}>
+            {(isEditing || onCancel) && (
+              <button type="button" className="btn-primary outline" onClick={onCancel || (() => {})}>
+                Cancelar
+              </button>
+            )}
+            <button type="submit" className="btn-primary full-width" disabled={isSubmitting} data-testid="submit-asset-btn" style={{ flex:1 }}>
+              {isSubmitting ? 'Guardando…' : isEditing ? '💾 Guardar cambios' : 'Guardar Activo'}
+            </button>
+          </div>
         </fieldset>
       </form>
     </div>
