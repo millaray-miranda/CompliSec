@@ -19,9 +19,10 @@ export const handleOnboarding = async (req, res, next) => {
     const result = await createOrganizationAndAdmin(organization, admin);
 
     const token = generateTokenForUser({
-      id: result.user.id,
+      id:              result.user.id,
+      name:            result.user.name,   // ← FIX: incluir name en el JWT
       organization_id: result.organizationId,
-      role: result.user.role,
+      role:            result.user.role,
     });
 
     return res.status(201).json({

@@ -167,6 +167,16 @@ const Dashboard = ({ organizationId, onNavigate, diagnosticRisks, onOpenDiagnost
             <div className="card-label">{label}</div>
           </div>
         ))}
+        {/* Card especial: activos con criticidad alta
+        {(() => {
+          const critCount = assets.filter(a => (a.confidentiality_req + a.integrity_req + a.availability_req) >= 12).length;
+          return (
+            <div className="glass-panel summary-card" style={{ borderColor: critCount > 0 ? 'rgba(239,68,68,.25)' : undefined }}>
+              <div className="big-number" style={{ color: critCount > 0 ? 'var(--danger)' : 'var(--success)' }}>{critCount}</div>
+              <div className="card-label">Activos críticos</div>
+            </div>
+          );
+        })()} */}
       </div>
 
       {/* ── Barra de cumplimiento ── */}
@@ -346,32 +356,101 @@ const Dashboard = ({ organizationId, onNavigate, diagnosticRisks, onOpenDiagnost
         {/* ── Activos ── */}
         <div className="glass-panel">
           <div className="section-header" style={{ marginBottom:'1rem' }}>
-            <h3 style={{ margin:0, fontSize:'1.1rem' }}>🗃️ Activos recientes</h3>
+            <h3 style={{ margin:0, fontSize:'1.1rem' }}>🗃️ Activos registrados</h3>
             <button className="btn-primary outline" style={{ padding:'0.3rem 0.75rem', fontSize:'0.8rem' }}
               onClick={() => onNavigate('assets')}>
               {assets.length > 0 ? 'Ver todos' : 'Registrar activo'}
             </button>
           </div>
+
+          {/* Resumen de criticidad */}
+          {assets.length > 0 && (() => {
+            const getCriticality = (a) => {
+              const cia = a.confidentiality_req + a.integrity_req + a.availability_req;
+              if (cia >= 12) return 'alta';
+              if (cia >= 8)  return 'media';
+              return 'baja';
+            };
+            const alta  = assets.filter(a => getCriticality(a) === 'alta').length;
+            const media = assets.filter(a => getCriticality(a) === 'media').length;
+            const baja  = assets.filter(a => getCriticality(a) === 'baja').length;
+            return (
+              <div style={{ display:'flex', gap:'0.5rem', marginBottom:'1rem' }}>
+                {[
+                  ['Críticos', alta,  'var(--danger)',  'rgba(239,68,68,.1)',  'rgba(239,68,68,.25)'],
+                  ['Medios',   media, 'var(--warning)', 'rgba(245,158,11,.1)', 'rgba(245,158,11,.25)'],
+                  ['Bajos',    baja,  'var(--success)', 'rgba(16,185,129,.1)', 'rgba(16,185,129,.25)'],
+                ].map(([label, count, color, bg, border]) => (
+                  <div key={label} style={{ flex:1, background:bg, border:`1px solid ${border}`, borderRadius:8, padding:'0.5rem', textAlign:'center' }}>
+                    <div style={{ fontSize:'1.4rem', fontWeight:700, color }}>{count}</div>
+                    <div style={{ fontSize:'0.65rem', color, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em' }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           {assets.length === 0 ? (
             <div style={{ textAlign:'center', padding:'2rem 0' }}>
               <p className="text-secondary">No hay activos registrados.</p>
               <button className="btn-primary" onClick={() => onNavigate('assets')}>Registrar primer activo</button>
             </div>
           ) : (
-            <div style={{ display:'flex', flexDirection:'column', gap:'0.6rem' }}>
-              {assets.slice(0, 5).map(asset => {
+            <div style={{ display:'flex', flexDirection:'column', gap:'0.5rem' }}>
+              {assets.slice(0, 6).map(asset => {
                 const cia = asset.confidentiality_req + asset.integrity_req + asset.availability_req;
-                const ciaColor = cia >= 12 ? 'var(--danger)' : cia >= 8 ? 'var(--warning)' : 'var(--success)';
+                const criticality = cia >= 12 ? 'CRÍTICA' : cia >= 8 ? 'MEDIA' : 'BAJA';
+                const critColor   = cia >= 12 ? 'var(--danger)' : cia >= 8 ? 'var(--warning)' : 'var(--success)';
+                const critBg      = cia >= 12 ? 'rgba(239,68,68,.12)' : cia >= 8 ? 'rgba(245,158,11,.12)' : 'rgba(16,185,129,.12)';
+                const critBorder  = cia >= 12 ? 'rgba(239,68,68,.3)'  : cia >= 8 ? 'rgba(245,158,11,.3)'  : 'rgba(16,185,129,.3)';
+                const critIcon    = cia >= 12 ? '🔴' : cia >= 8 ? '🟡' : '🟢';
                 return (
-                  <div key={asset.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0.6rem 0.75rem', background:'rgba(0,0,0,0.15)', borderRadius:'0.5rem', gap:'1rem' }}>
+                  <div key={asset.id} style={{
+                    display:'flex', alignItems:'center', gap:'0.75rem',
+                    padding:'0.65rem 0.85rem',
+                    background: cia >= 12 ? 'rgba(239,68,68,.04)' : 'rgba(0,0,0,0.15)',
+                    border: `1px solid ${cia >= 12 ? 'rgba(239,68,68,.15)' : 'var(--border)'}`,
+                    borderRadius:'0.5rem',
+                  }}>
+                    {/* Icono de criticidad */}
+                    <span style={{ fontSize:'0.9rem', flexShrink:0 }}>{critIcon}</span>
+
+                    {/* Info del activo */}
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:'0.85rem', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{asset.name}</div>
-                      <div className="text-secondary text-small">C:{asset.confidentiality_req} I:{asset.integrity_req} A:{asset.availability_req}</div>
+                      <div style={{ fontSize:'0.85rem', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {asset.name}
+                      </div>
+                      <div style={{ display:'flex', gap:'0.4rem', marginTop:'2px', fontSize:'0.7rem', color:'var(--text-secondary)' }}>
+                        <span title="Confidencialidad">C: <strong>{asset.confidentiality_req}</strong></span>
+                        <span>·</span>
+                        <span title="Integridad">I: <strong>{asset.integrity_req}</strong></span>
+                        <span>·</span>
+                        <span title="Disponibilidad">A: <strong>{asset.availability_req}</strong></span>
+                        <span>·</span>
+                        <span>CIA: <strong>{cia}</strong>/15</span>
+                      </div>
                     </div>
-                    <span style={{ fontSize:'0.72rem', fontWeight:600, color:ciaColor, flexShrink:0 }}>CIA: {cia}</span>
+
+                    {/* Badge de criticidad */}
+                    <span style={{
+                      fontSize:'0.68rem', fontWeight:700, letterSpacing:'0.04em',
+                      color: critColor, background: critBg,
+                      border: `1px solid ${critBorder}`,
+                      borderRadius: 6, padding:'2px 8px', flexShrink:0,
+                    }}>
+                      {criticality}
+                    </span>
                   </div>
                 );
               })}
+              {assets.length > 6 && (
+                <button
+                  onClick={() => onNavigate('assets')}
+                  style={{ background:'none', border:'1px solid var(--border)', color:'var(--text-secondary)', fontSize:'0.78rem', padding:'0.5rem', borderRadius:6, cursor:'pointer', textAlign:'center', marginTop:'0.25rem' }}
+                >
+                  Ver {assets.length - 6} activos más →
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -427,4 +506,3 @@ const Dashboard = ({ organizationId, onNavigate, diagnosticRisks, onOpenDiagnost
 };
 
 export default Dashboard;
-

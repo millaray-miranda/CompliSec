@@ -114,21 +114,39 @@ const DiagnosticWizard = ({ organizationId, userName, onComplete }) => {
     }
   };
 
-  // Stepbar
+  // Sidebar vertical de pasos
   const Stepbar = () => (
-    <div style={{ display:'flex', alignItems:'center', overflowX:'auto', gap:0 }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
       {STEPS.map((label, i) => {
         const done = i < step, active = i === step;
         return (
-          <React.Fragment key={i}>
-            <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0, cursor: done?'pointer':'default' }} onClick={() => done && setStep(i)}>
-              <div style={{ width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.75rem', fontWeight:700, flexShrink:0, border:`2px solid ${done?'var(--success)':active?'var(--accent)':'var(--border)'}`, color: done?'var(--success)':active?'#fff':'var(--text-secondary)', background: active?'var(--accent)':done?'rgba(16,185,129,.1)':'transparent', transition:'all .2s' }}>
-                {done ? '✓' : i+1}
-              </div>
-              <span style={{ fontSize:'0.78rem', fontWeight:600, whiteSpace:'nowrap', color: active?'var(--text-primary)':done?'var(--success)':'var(--text-secondary)' }}>{label}</span>
+          <div key={i}
+            onClick={() => done && setStep(i)}
+            style={{
+              display:'flex', alignItems:'center', gap:'0.75rem',
+              padding:'0.55rem 0.75rem', borderRadius:8,
+              cursor: done ? 'pointer' : 'default',
+              background: active ? 'rgba(59,130,246,.12)' : 'transparent',
+              border: active ? '1px solid rgba(59,130,246,.25)' : '1px solid transparent',
+              transition:'all .2s',
+            }}
+          >
+            <div style={{
+              width:28, height:28, borderRadius:'50%', flexShrink:0,
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize:'0.75rem', fontWeight:700,
+              border:`2px solid ${done ? 'var(--success)' : active ? 'var(--accent)' : 'var(--border)'}`,
+              color: done ? 'var(--success)' : active ? '#fff' : 'var(--text-secondary)',
+              background: active ? 'var(--accent)' : done ? 'rgba(16,185,129,.1)' : 'transparent',
+              transition:'all .2s',
+            }}>
+              {done ? '✓' : i+1}
             </div>
-            {i < STEPS.length-1 && <div style={{ flex:1, minWidth:12, maxWidth:36, height:1, margin:'0 5px', background: done?'var(--success)':'var(--border)', opacity:.6 }} />}
-          </React.Fragment>
+            <span style={{
+              fontSize:'0.82rem', fontWeight:600,
+              color: active ? 'var(--text-primary)' : done ? 'var(--success)' : 'var(--text-secondary)',
+            }}>{label}</span>
+          </div>
         );
       })}
     </div>
@@ -310,6 +328,7 @@ const DiagnosticWizard = ({ organizationId, userName, onComplete }) => {
 
   return (
     <div style={{ minHeight:'100vh', background:'var(--bg-color)', display:'flex', flexDirection:'column' }}>
+      <style>{`select option { background: #2d3748; color: #f8fafc; }`}</style>
 
       {/* Header */}
       <div style={{ borderBottom:'1px solid var(--border)', padding:'0.85rem 2rem', display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:10, background:'rgba(15,23,42,.9)', backdropFilter:'blur(12px)' }}>
@@ -326,43 +345,43 @@ const DiagnosticWizard = ({ organizationId, userName, onComplete }) => {
         </div>
       </div>
 
-      {/* Contenido */}
-      <div style={{ flex:1, maxWidth:760, width:'100%', margin:'0 auto', padding:'2.5rem 1.5rem' }}>
+      {/* Contenido — sidebar + área principal */}
+      <div style={{ flex:1, maxWidth:1000, width:'100%', margin:'0 auto', padding:'2.5rem 1.5rem', display:'flex', gap:'1.5rem', alignItems:'flex-start' }}>
 
-        {/* Progreso */}
-        <div className="glass-panel" style={{ marginBottom:'2rem', padding:'1.25rem 1.5rem' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'0.75rem' }}>
-            <span style={{ fontSize:'0.8rem', color:'var(--text-secondary)', fontWeight:500 }}>Paso {step+1} de {STEPS.length}</span>
-            <span style={{ fontSize:'0.8rem', color:'var(--success)', fontWeight:600 }}>{pct}% completado</span>
-          </div>
-          <div style={{ height:3, background:'rgba(255,255,255,.06)', borderRadius:2, marginBottom:'1.25rem', overflow:'hidden' }}>
-            <div style={{ height:3, width:`${pct}%`, background:'linear-gradient(90deg,var(--accent),var(--success))', borderRadius:2, transition:'width .4s ease' }} />
+        {/* Sidebar vertical */}
+        <div className="glass-panel" style={{ width:210, flexShrink:0, padding:'1.25rem 1rem', position:'sticky', top:'4.5rem' }}>
+          <div style={{ marginBottom:'1.25rem' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'0.4rem' }}>
+              <span style={{ fontSize:'0.72rem', color:'var(--text-secondary)' }}>Progreso</span>
+              <span style={{ fontSize:'0.72rem', color:'var(--success)', fontWeight:700 }}>{pct}%</span>
+            </div>
+            <div style={{ height:3, background:'rgba(255,255,255,.06)', borderRadius:2, overflow:'hidden' }}>
+              <div style={{ height:3, width:`${pct}%`, background:'linear-gradient(90deg,var(--accent),var(--success))', borderRadius:2, transition:'width .4s ease' }} />
+            </div>
           </div>
           <Stepbar />
         </div>
 
-        {/* Paso actual */}
-        <div className="glass-panel" style={{ padding:'2rem', marginBottom:'1.5rem' }}>
-          {steps[step]}
-        </div>
-
-        {/* Navegación */}
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <button onClick={()=>step>0&&setStep(s=>s-1)} disabled={step===0} style={{ padding:'0.75rem 1.75rem', borderRadius:8, fontSize:'0.9rem', fontWeight:600, cursor: step===0?'not-allowed':'pointer', background:'transparent', color: step===0?'var(--border)':'var(--text-secondary)', border:`1px solid ${step===0?'var(--border)':'rgba(255,255,255,.15)'}` }}>
-            ← Anterior
-          </button>
-          <div style={{ display:'flex', gap:'0.4rem', alignItems:'center' }}>
-            {STEPS.map((_,i) => <div key={i} style={{ width:i===step?20:6, height:6, borderRadius:3, background: i<step?'var(--success)':i===step?'var(--accent)':'var(--border)', transition:'all .2s' }} />)}
+        {/* Área de contenido */}
+        <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:'1.25rem' }}>
+          <div className="glass-panel" style={{ padding:'2rem' }}>
+            {steps[step]}
           </div>
-          {step < STEPS.length-1 ? (
-            <button onClick={()=>setStep(s=>s+1)} className="btn-primary" style={{ padding:'0.75rem 1.75rem', fontSize:'0.9rem' }}>
-              Siguiente →
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <button onClick={()=>step>0&&setStep(s=>s-1)} disabled={step===0} style={{ padding:'0.75rem 1.75rem', borderRadius:8, fontSize:'0.9rem', fontWeight:600, cursor: step===0?'not-allowed':'pointer', background:'transparent', color: step===0?'var(--border)':'var(--text-secondary)', border:`1px solid ${step===0?'var(--border)':'rgba(255,255,255,.15)'}` }}>
+              ← Anterior
             </button>
-          ) : (
-            <button onClick={handleFinish} disabled={saving} className="btn-primary" style={{ padding:'0.75rem 2rem', fontSize:'0.9rem', opacity:saving?0.7:1, cursor:saving?'not-allowed':'pointer' }}>
-              {saving ? 'Guardando...' : '✅ Generar perfil de cumplimiento'}
-            </button>
-          )}
+            <span style={{ fontSize:'0.78rem', color:'var(--text-secondary)' }}>Paso {step+1} de {STEPS.length}</span>
+            {step < STEPS.length-1 ? (
+              <button onClick={()=>setStep(s=>s+1)} className="btn-primary" style={{ padding:'0.75rem 1.75rem', fontSize:'0.9rem' }}>
+                Siguiente →
+              </button>
+            ) : (
+              <button onClick={handleFinish} disabled={saving} className="btn-primary" style={{ padding:'0.75rem 2rem', fontSize:'0.9rem', opacity:saving?0.7:1, cursor:saving?'not-allowed':'pointer' }}>
+                {saving ? 'Guardando...' : '✅ Generar perfil de cumplimiento'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

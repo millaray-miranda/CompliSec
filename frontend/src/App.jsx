@@ -35,15 +35,19 @@ function App() {
     try {
       const decoded = jwtDecode(token);
       if (decoded.exp * 1000 > Date.now()) {
-        const user = {
-          id:              decoded.userId,
-          name:            decoded.name || decoded.email || 'Usuario',
-          organization_id: decoded.organizationId,
-          role:            decoded.role,
+        const restoreUser = async () => {
+          // Si el token no trae name (tokens emitidos antes del fix), lo pedimos al backend
+          const name = decoded.name || await fetchUserName(token);
+          const user = {
+            id:              decoded.userId,
+            name:            name || decoded.email || 'Usuario',
+            organization_id: decoded.organizationId,
+            role:            decoded.role,
+          };
+          setCurrentUser(user);
+          checkAndSetState(user.organization_id, token);
         };
-        setCurrentUser(user);
-        // Al restaurar sesión, verificar si tiene diagnóstico para mostrar el wizard
-        checkAndSetState(user.organization_id, token);
+        restoreUser();
       } else {
         localStorage.removeItem('token');
       }
